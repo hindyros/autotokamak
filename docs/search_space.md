@@ -170,7 +170,7 @@ How we present the 5 physics parameters to the model.
 
 | Knob | Today | Tunable? | Lives where |
 |---|---|---|---|
-| Raw features | `[r0, a, kappa, delta, Ip]` | Yes — could add derived terms | `eval/data.py:PARAM_ORDER` |
+| Raw features | `[r0, a, kappa, delta, Ip]` | Yes — could add derived terms | `surrogate/dataset.py:PARAM_ORDER` |
 | Input scaling | None (poly-ridge has its own `StandardScaler`) | **Not currently exposed** | implicit per-model |
 | Derived features | None | **Not currently exposed** | — |
 | Categorical / discrete handling | N/A (all numeric) | — | — |
@@ -193,11 +193,11 @@ no classical regressor handles that natively on 16 samples.
 
 | Knob | Today | Tunable? | Lives where |
 |---|---|---|---|
-| Reduction method | PCA (sklearn) | Limited to PCA | `eval/reduce.py:fit_pca` |
+| Reduction method | PCA (sklearn) | Limited to PCA | `surrogate/reduce.py:fit_pca` |
 | `n_components` | Agent picks per round | Yes | `SearchSpec.n_pca_components` |
 | Variance target | Soft 0.95 in prompt | Yes | prompt's REDUCTION CONTRACT |
-| Fit scope | Per fold, train only | Locked | `surrogate/automl.py` |
-| NaN handling | Replace with per-pixel train mean | Yes — could mask, could zero-fill | `eval/reduce.py:fit_pca` |
+| Fit scope | Per fold, train only | Locked | `surrogate/optuna_search.py` |
+| NaN handling | Replace with per-pixel train mean | Yes — could mask, could zero-fill | `surrogate/reduce.py:fit_pca` |
 | Output scaling | None (PCA already centers) | — | — |
 
 **Not exposed but plausible:**
@@ -222,7 +222,7 @@ Worth letting the agent pick between PCA and POD in a later round.
 | `k_folds` | 4 | Yes | `SurrogateConfig.k_folds` |
 | `test_frac` | 2/16 ≈ 0.125 | Yes | `SurrogateConfig.test_frac` |
 | Random seed | 0 | Yes | `SurrogateConfig.seed` |
-| Stratification | None (random shuffle) | **Not exposed** | `eval/data.py:kfold` |
+| Stratification | None (random shuffle) | **Not exposed** | `surrogate/dataset.py:kfold` |
 
 **Not exposed but matters at N=16:**
 
@@ -276,7 +276,7 @@ see "the MLP plateaus too early," raising `max_iter` is the first move.
 
 | Knob | Today | Tunable? | Lives where |
 |---|---|---|---|
-| Sampler | TPE (seeded) | Locked | `surrogate/automl.py:run_study` |
+| Sampler | TPE (seeded) | Locked | `surrogate/optuna_search.py:run_study` |
 | Pruner | None | Locked | — |
 | `n_trials` per model | Agent picks | Yes | `ModelSpec.n_trials` |
 | Multi-fidelity | None | Not exposed | — |
@@ -405,7 +405,7 @@ argue for:
 
 The single highest-leverage move is **P0**: a better dataset moves
 *everything*. The cheapest agent-side expansion is **P1**: adding the
-feature-set choice is ~20 lines in `eval/data.py` and an extra field on
+feature-set choice is ~20 lines in `surrogate/dataset.py` and an extra field on
 `SearchSpec`.
 
 ---

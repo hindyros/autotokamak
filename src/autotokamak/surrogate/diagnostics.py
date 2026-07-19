@@ -17,9 +17,9 @@ from typing import Any, Callable
 
 import numpy as np
 
-from autotokamak.eval.data import DatasetBundle, kfold
-from autotokamak.eval.metrics import baseline_mean_predictor_rmse, psi_rmse
-from autotokamak.eval.reduce import fit_pca, inverse_transform, transform
+from autotokamak.surrogate.dataset import DatasetBundle, kfold
+from autotokamak.surrogate.metrics import baseline_mean_predictor_rmse, psi_rmse
+from autotokamak.surrogate.reduce import fit_pca, inverse_transform, transform
 
 
 def learning_curve(
@@ -201,7 +201,7 @@ def residual_structure(
     correlation with one input → that part of the input space is
     undertrained. Strong spatial pattern → model capacity bottleneck.
     """
-    from autotokamak.surrogate.automl import predict_with_winner
+    from autotokamak.surrogate.optuna_search import predict_with_winner
 
     test_idx = splits.test_idx
     if test_idx.size == 0:
@@ -218,7 +218,7 @@ def residual_structure(
 
     # Correlate |residual| with each input column.
     input_corrs: dict[str, float] = {}
-    from autotokamak.eval.data import PARAM_ORDER
+    from autotokamak.surrogate.dataset import PARAM_ORDER
 
     for j, p in enumerate(PARAM_ORDER):
         col = X_test[:, j]
@@ -250,7 +250,7 @@ def edge_hit_summary(study_result) -> dict[str, Any]:
     """Per-model count of hyperparameters that landed on the edge of their range.
 
     Wraps the edge-hit flags already populated by
-    ``surrogate.automl._detect_edge_hit``; presents them as a JSON-friendly
+    ``surrogate.optuna_search._detect_edge_hit``; presents them as a JSON-friendly
     summary the agent can read directly.
     """
     out: dict[str, Any] = {}

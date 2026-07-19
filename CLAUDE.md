@@ -18,27 +18,26 @@ It builds on:
 autotokamak/                        # repo root
 ├── pyproject.toml                  # package metadata, deps, optional [ml] [dev]
 ├── src/autotokamak/                # the importable package
-│   ├── core/                       # shared utilities (geometry, solver, io, diagnostics, logging, schema)
-│   ├── pipelines/                  # PRIMARY entry point: phase1/phase2/meta CLI (--mode fast|ursa)
+│   ├── core/                       # shared utilities (geometry, solver, io, schema)
+│   ├── pipelines/                  # PRIMARY entry point: phase1/phase2/meta CLI (--mode fast|ursa) + discover.py
 │   ├── agent/                      # URSA runners + prompts + DSPy + orchestrator
 │   │   ├── runners/                # plan_execute, plan_execute_feedback, meta_loop, scoring, trace
 │   │   ├── prompts/                # YAML prompts the agent consumes
 │   │   ├── dspy/                   # DSPy signatures/modules/metrics for the meta + search pickers
 │   │   └── orchestrator/           # meta-loop actions + schema (MetaConfig, EnvelopeConfig)
 │   ├── data/                       # sweep generation, HDF5 io, active-learning acquisition + envelope
-│   ├── surrogate/                  # structured AutoML: automl_loop, automl, zoo, schema (Optuna model zoo)
-│   ├── models/                     # trained-model loaders (still mostly a stub)
-│   └── eval/                       # metrics, diagnostics, reduce (PCA), eval data loaders
+│   └── surrogate/                  # Phase-2 AutoML: dataset/reduce/metrics, zoo, optuna_search, automl_loop, diagnostics
 ├── examples/                       # runnable demos + generated agent workspaces
 │   ├── fixed_boundary/             # analytic + EQDSK demo (hardcoded physics)
 │   ├── config_driven_equilibrium/  # YAML-driven runner + sweep + ψ inverter
 │   ├── dataset_generation/         # Phase-1 workspace (fast/ + ursa/ outputs)
 │   └── surrogate_meta/             # meta-loop workspace (fast/ + ursa/ outputs)
+├── just_ursa/                      # single-prompt URSA capability experiment (no scaffolding)
+├── notebooks/                      # manual surrogate + scaling-law notebooks (run dirs gitignored)
 ├── tests/                          # pytest suite (smoke + schema + geometry + e2e mocks)
-├── data/                           # gitignored: raw/, processed/ for training datasets
-├── models/                         # gitignored: checkpoints/
+├── tools/                          # post-run analysis scripts (see tools/README.md)
 ├── experiments/                    # gitignored: per-experiment configs and logs
-├── docs/                           # architecture diagrams and design notes
+├── docs/                           # design notes; paper drafts under docs/paper/
 └── outputs/                        # gitignored: per-run artifacts from example scripts
 ```
 
@@ -168,11 +167,11 @@ on a 2D triangular mesh of a D-shaped plasma cross-section. Inputs: LCFS shape (
 
 ## Things to keep in mind when editing
 
-- **Use `autotokamak.core`** for any geometry / solver / IO / logging logic. Don't duplicate it — extend the library.
+- **Use `autotokamak.core`** for any geometry / solver / IO logic, and `autotokamak.surrogate` for anything surrogate-training related (dataset loading, PCA, metrics, model zoo). Don't duplicate — extend the library.
 - `examples/config_driven_equilibrium/run_equilibrium_from_config.py` is the **reference template** — config-driven, uses `core/`, extensible. Build new sweeps on this pattern.
 - `examples/fixed_boundary/run_fixed_boundary_equilibrium.py` is a legacy first-pass demo. It still works but does not yet route through `core/`; treat it as a reference for the EQDSK-loading workflow.
 - **OFT singleton**: only one `OpenFUSIONToolkit.OFT_env` can ever be created per Python kernel. `core.solver.make_solver` accepts an optional `env=` to reuse the existing one — required for any retry path or for batched solves in one process.
 - Never write into side-cloned `./ursa/` or `./OpenFUSIONToolkit/` if you have them locally — they're read-only and gitignored.
 - Agent prompts in `src/autotokamak/agent/prompts/*.yaml` contain hard `CONSTRAINTS:` blocks (no `git`, no `pip install`, no `input()`). Preserve these when editing.
-- `outputs/`, `data/raw/`, `data/processed/`, `models/checkpoints/`, `experiments/` are all gitignored. Don't commit generated artifacts.
+- `outputs/`, `logs/`, `experiments/`, heavy example artifacts (`examples/**/*.h5`, `*.pkl`), and notebook run dirs are all gitignored. Don't commit generated artifacts; per-run artifacts belong under `experiments/<tag>/`.
 - Run `pytest tests/ -v` after structural changes; `pytest tests/ -v -m slow` to include the full OFT solve smoke test.

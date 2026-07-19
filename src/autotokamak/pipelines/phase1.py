@@ -5,7 +5,6 @@ ursa mode: invokes URSA plan_execute_feedback on dataset_generation.yaml.
 """
 from __future__ import annotations
 
-import sys
 import tempfile
 from pathlib import Path
 from typing import Optional
@@ -88,8 +87,7 @@ def run_phase1_ursa(
     print(f"[phase1/ursa] Invoking URSA on {prompt_path.name} → {out_dir}")
 
     # Import lazily — URSA/langchain not available at module load time
-    sys.path.insert(0, str(REPO_ROOT / "src" / "autotokamak"))
-    from agent.runners.plan_execute_feedback import main as feedback_main  # type: ignore[import-not-found]
+    from autotokamak.agent.runners.plan_execute_feedback import main as feedback_main
 
     feedback_main(
         config_path=overlay_path,

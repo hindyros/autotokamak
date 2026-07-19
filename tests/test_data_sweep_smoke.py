@@ -75,7 +75,7 @@ def test_run_sweep_produces_phase1_compatible_h5(tmp_path: Path):
 def test_run_sweep_outputs_load_through_eval_data(tmp_path: Path):
     from autotokamak.data.schema import SweepConfig
     from autotokamak.data.sweep import run_sweep
-    from autotokamak.eval.data import load_dataset
+    from autotokamak.surrogate.dataset import load_dataset
 
     cfg = SweepConfig.model_validate(_tiny_config())
     result = run_sweep(cfg, tmp_path)

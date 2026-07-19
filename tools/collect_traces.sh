@@ -94,7 +94,7 @@ for ((i=0; i<N; i++)); do
     # iteration log in the trainset.
     WS="$EXPERIMENTS_DIR/ws/run_$(printf '%03d' "$i")"
     echo "--- run $((i+1))/$N  max-iterations=$ITERS  workspace=$WS ---"
-    PYTHONPATH=src/autotokamak python -m agent.runners.meta_loop \
+    python -m autotokamak.agent.runners.meta_loop \
         --config src/autotokamak/agent/prompts/surrogate_meta.yaml \
         --model "$MODEL" \
         --max-iterations "$ITERS" \
@@ -114,7 +114,7 @@ echo "  elapsed:   ${elapsed}s"
 echo "  traces in $EXPERIMENTS_DIR: $n_traces"
 echo ""
 echo "Next: run GEPA optimization"
-echo "  PYTHONPATH=src/autotokamak python -m autotokamak.agent.dspy.optimize_meta \\"
+echo "  python -m autotokamak.agent.dspy.optimize_meta \\"
 echo "      --experiments-dir $EXPERIMENTS_DIR \\"
 echo "      --output src/autotokamak/agent/dspy/optimized/meta_picker.json \\"
 echo "      --auto medium"

@@ -25,14 +25,14 @@ import sys
 
 from dotenv import load_dotenv
 
-from agent.runners.config import (
+from autotokamak.agent.runners.config import (
     REPO_ROOT,
     load_config,
     materialize_symlinks,
     resolve_workspace,
 )
-from agent.runners.scoring import try_score
-from agent.runners.trace import RunTrace
+from autotokamak.agent.runners.scoring import try_score
+from autotokamak.agent.runners.trace import RunTrace
 
 load_dotenv(REPO_ROOT / ".env")
 

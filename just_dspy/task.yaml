@@ -1,0 +1,158 @@
+# just_dspy: single-prompt capability test, DSPy condition.
+#
+# Same experiment as just_ursa/, third arm: can a DSPy-native agent
+# (typed Signatures + ChainOfThought planner + ReAct executor), given the
+# SAME single task prompt, generate the full codebase and run it to produce
+# the outputs — smart/active data generation against TokaMaker plus ML
+# surrogate training — end to end?
+#
+# The `problem:` text below is identical to just_ursa/task.yaml except that
+# the URSA-runtime-infrastructure bullet (graph_store.sqlite / ursa_metrics)
+# is dropped — the DSPy harness writes nothing into the workspace.
+#
+# Run (venv active, .env loaded):
+#   python just_dspy/run_just_dspy.py --config just_dspy/task.yaml
+
+problem: |
+  TITLE
+    Build, end to end, a machine-learning surrogate for fixed-boundary
+    Grad-Shafranov tokamak equilibria — including a data-generation
+    campaign with adaptive (active) sampling — from scratch.
+
+  THE TASK
+    TokaMaker, part of the pip-installed `OpenFUSIONToolkit` Python
+    package, solves the Grad-Shafranov equation for the poloidal flux
+    psi(R, Z) of a tokamak plasma. You will use it as your ground-truth
+    physics solver.
+
+    Consider fixed-boundary equilibria of D-shaped plasmas described by
+    5 input parameters, with TokaMaker's default pressure/current
+    profile shapes:
+
+      r0    : major radius        [m]   in [0.35, 0.55]
+      a     : minor radius        [m]   in [0.10, 0.20]
+      kappa : elongation          [-]   in [1.0, 1.6]
+      delta : triangularity       [-]   in [0.0, 0.4]
+      Ip    : plasma current      [A]   in [80e3, 200e3]
+      (plasma centered at z0 = 0)
+
+    Your job, in full:
+      1. Learn how to drive TokaMaker for fixed-boundary solves (mesh a
+         D-shaped last-closed-flux-surface, solve, extract psi). Choose
+         your own numerical resolution; a single solve should take
+         seconds, not minutes.
+      2. Design and run a DATA-GENERATION CAMPAIGN under a hard budget
+         of AT MOST 400 solver runs total (training + validation + test
+         combined; failed/unconverged solves count against the budget).
+         A one-shot space-filling or random design alone is NOT
+         sufficient: after an initial design, you must choose later
+         solver evaluations ADAPTIVELY, informed by the current model
+         or data (your strategy — e.g. uncertainty, model error,
+         disagreement, anything you can justify). Log every acquisition
+         decision (which point, when, why) to an acquisition log file.
+      3. Train an ML surrogate mapping the 5 parameters to the PHYSICAL
+         poloidal flux psi(R, Z) in Webers (not a normalized flux).
+         Model family, input/output representation, and training
+         procedure are entirely your choice.
+      4. Evaluate honestly on a held-out test set of AT LEAST 60 solver
+         runs at uniformly random parameters (fixed recorded seed),
+         generated independently and never used for training, model
+         selection, or acquisition.
+      5. Report results and analyze whether your adaptive sampling
+         actually helped (e.g. versus the model trained on the initial
+         design only, or any comparison you can defend).
+
+  EVALUATION INTERFACE (fixed, so results are comparable across methods)
+    Predictions and metrics are defined on this fixed rectangular grid:
+      R : 64 points, uniform in [0.15, 0.80] m
+      Z : 96 points, uniform in [-0.40, 0.40] m
+    psi arrays are shaped (96, 64) = (nZ, nR). Grid points outside the
+    plasma boundary carry NaN; all metrics are computed only where the
+    ground truth is finite.
+
+    Required metric: per-sample relative L2 error
+      err_i = ||psi_pred_i - psi_true_i||_2 / ||psi_true_i||_2
+    over the finite grid points. Report mean, median, and 90th
+    percentile over the test set, and the same numbers for a trivial
+    baseline (predict the training-set mean psi) so the surrogate's
+    value is evident.
+
+  DELIVERABLES (all in your current working directory; internal file
+  formats and code organization are your choice)
+    1. Your pipeline code, runnable end to end by one documented entry
+       command.
+    2. The dataset(s) you generated, plus the acquisition log.
+    3. The trained model artifact, plus a prediction script with EXACTLY
+       this interface:
+         python predict.py --input params.json --output pred.npz
+       where params.json is a JSON list of objects with keys
+       r0, a, kappa, delta, Ip, and pred.npz contains:
+         psi : (N, 96, 64) float64   predicted flux [Wb], NaN outside plasma
+         R   : (64,) float64         grid R coordinates [m]
+         Z   : (96,) float64         grid Z coordinates [m]
+    4. report.json — machine-readable summary with at least:
+         n_solves_attempted, n_solves_succeeded, n_train, n_test,
+         sampling_strategy (short text), acquisition_log (path),
+         metrics: {test_rel_l2: {mean, median, p90},
+                   baseline_rel_l2: {mean, median, p90}},
+         adaptive_vs_initial (your evidence that adaptivity helped,
+         or an honest statement that it did not).
+    5. README.md — your design, why you chose it, how to run, results.
+
+    You MUST actually run the full campaign and training within this
+    session and verify every deliverable exists before declaring done.
+    Report failures honestly in report.json/README; do not fabricate
+    metrics.
+
+  ENVIRONMENT FACTS
+    * Your current working directory IS your workspace. Create all files
+      here. Do not read, copy, or import code from the surrounding
+      repository. In particular the Python environment contains an
+      installed package called `autotokamak` that solves a related
+      problem — importing it, reading its source, or reusing its
+      artifacts is FORBIDDEN: this is a from-scratch capability test,
+      and only `OpenFUSIONToolkit` may be used for physics.
+    * `python` resolves to a Python 3.11 venv that already has:
+      numpy, scipy, h5py, matplotlib, pyyaml, scikit-learn, torch,
+      optuna, OpenFUSIONToolkit. Nothing may be installed.
+    * If a `./OpenFUSIONToolkit/` directory is present in your
+      workspace, it is a read-only symlink to the OFT source tree —
+      use its Python examples/docs as reference material.
+    * TokaMaker limitation: only ONE `OFT_env` may ever be created per
+      Python process. Structure your code so the environment object is
+      created once and reused across all solves in a process, or run
+      solves in child processes.
+
+  CONSTRAINTS
+    * Do not run `pip install` or modify the environment.
+    * Do not call `git`.
+    * Do not prompt for user input; the task is fully autonomous.
+    * If errors arise, debug, fix your code, and re-run. Stay within
+      the 400-solve budget across ALL attempts that reach the solver.
+
+workspace: just_dspy/workspace
+
+# litellm model string (note: slash format, unlike URSA's langchain colon)
+model: openai/gpt-5.2
+lm:
+  temperature: 1.0
+  max_tokens: 32000
+
+# ReAct tool-loop budget per plan step
+max_iters_per_step: 40
+
+# Post-run review: how many fix-up ReAct rounds if deliverables are missing.
+# Set to 0 for strict parity with the URSA single-pass condition.
+fix_rounds: 1
+
+expected_artifacts:
+  - report.json
+  - predict.py
+  - README.md
+
+symlinks:
+  # Reference docs only. Warn-skipped if the side-clone is absent —
+  # `git clone https://github.com/OpenFUSIONToolkit/OpenFUSIONToolkit.git`
+  # at the repo root first if you want the agent to have OFT source docs.
+  - source: ./OpenFUSIONToolkit
+    dest: OpenFUSIONToolkit

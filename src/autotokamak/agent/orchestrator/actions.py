@@ -134,8 +134,8 @@ def _refit_winner_on_pool(state: MetaState) -> Optional[Dict[str, Any]]:
     if payload is None:
         return None
     try:
-        from autotokamak.eval.data import load_dataset
-        from autotokamak.eval.reduce import fit_pca, transform
+        from autotokamak.surrogate.dataset import load_dataset
+        from autotokamak.surrogate.reduce import fit_pca, transform
         from autotokamak.surrogate.zoo import make_model
 
         bundle = load_dataset(state.current_dataset_h5)
@@ -357,9 +357,9 @@ def _frozen_shard_rmse(winner_payload: dict, state: MetaState) -> Optional[float
     if winner_payload is None or state.test_shard_h5 is None:
         return None
     try:
-        from autotokamak.eval.data import load_dataset
-        from autotokamak.eval.metrics import psi_rmse
-        from autotokamak.surrogate.automl import predict_with_winner
+        from autotokamak.surrogate.dataset import load_dataset
+        from autotokamak.surrogate.metrics import psi_rmse
+        from autotokamak.surrogate.optuna_search import predict_with_winner
 
         if state.shard_bundle_cache is None:
             state.shard_bundle_cache = load_dataset(state.test_shard_h5)
@@ -484,7 +484,7 @@ def _extend_search_codegen(payload: ExtendSearchFocus, state: MetaState) -> Dict
 
     # Programmatic invocation. Imported lazily so the orchestrator module
     # has no hard dependency on langchain/ursa at import time.
-    from agent.runners.plan_execute_feedback import main as feedback_main
+    from autotokamak.agent.runners.plan_execute_feedback import main as feedback_main
 
     started = time.time()
     feedback_main(

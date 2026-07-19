@@ -60,7 +60,7 @@ generation spec (`n_eval`, `parameters`, `seed`). Default `n_eval=256`.
 
 Scoring is stratified: each eval sample is binned into a joint geometry cell
 (2 bins/dim → 32 cells) plus per-parameter tercile marginals
-(`eval.metrics.per_cell_errors`). Headline numbers: `worst_cell_rmse`,
+(`surrogate.metrics.per_cell_errors`). Headline numbers: `worst_cell_rmse`,
 `mean_cell_rmse`, `cells_covered` — these show *which* geometries improved,
 which is the whole point of active sampling.
 

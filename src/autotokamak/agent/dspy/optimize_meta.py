@@ -2,7 +2,7 @@
 
 Usage::
 
-    PYTHONPATH=src/autotokamak python -m autotokamak.agent.dspy.optimize_meta \
+    python -m autotokamak.agent.dspy.optimize_meta \
         --experiments-dir experiments/ \
         --output src/autotokamak/agent/dspy/optimized/meta_picker.json \
         --auto medium

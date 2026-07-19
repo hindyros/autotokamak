@@ -7,7 +7,7 @@
 # currently freezes at raw-inputs -> physical-psi -> PCA.
 #
 # Run with the venv activated and .env loaded:
-#   PYTHONPATH=src/autotokamak python -m agent.runners.plan_execute_feedback \
+#   python -m autotokamak.agent.runners.plan_execute_feedback \
 #       --config src/autotokamak/agent/prompts/representation_search.yaml
 
 problem: |
@@ -42,14 +42,14 @@ problem: |
     torch/tensorflow, changing the dataset itself.
 
   EVALUATION PROTOCOL (fixed — every candidate is scored identically)
-    - load with autotokamak.eval.data.load_dataset; build ONE
+    - load with autotokamak.surrogate.dataset.load_dataset; build ONE
       kfold(bundle, k=4, test_frac=0.15, seed=0) split and reuse it for
       every candidate (identical folds, identical test set)
     - model class fixed to kernel_ridge with autotokamak.surrogate.zoo
       DEFAULT_SEARCH_SPACES ranges and the SAME small Optuna budget per
       candidate (e.g. 16 trials) — the representation is the variable,
       not the model
-    - metric: autotokamak.eval.metrics.psi_rmse in ORIGINAL physical psi
+    - metric: autotokamak.surrogate.metrics.psi_rmse in ORIGINAL physical psi
       space — apply the candidate's inverse transform before scoring, so
       transformed-space wins cannot fake a victory
     - report per-candidate val RMSE (fold-averaged), test RMSE evaluated

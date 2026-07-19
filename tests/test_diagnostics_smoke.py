@@ -9,7 +9,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from autotokamak.eval.data import DatasetBundle
+from autotokamak.surrogate.dataset import DatasetBundle
 
 
 def _synthetic_bundle(n: int = 16, nz: int = 8, nr: int = 6, seed: int = 0) -> DatasetBundle:
@@ -39,7 +39,7 @@ def _factory():
 
 
 def test_learning_curve_returns_curve_and_slope():
-    from autotokamak.eval.diagnostics import learning_curve
+    from autotokamak.surrogate.diagnostics import learning_curve
 
     bundle = _synthetic_bundle()
     out = learning_curve(bundle, model_factory=_factory, sub_sizes=(8, 12, 16))
@@ -50,7 +50,7 @@ def test_learning_curve_returns_curve_and_slope():
 
 
 def test_cross_seed_variance_reports_cv():
-    from autotokamak.eval.diagnostics import cross_seed_variance
+    from autotokamak.surrogate.diagnostics import cross_seed_variance
 
     bundle = _synthetic_bundle()
     out = cross_seed_variance(bundle, model_factory=_factory, seeds=(0, 1, 2))
@@ -59,7 +59,7 @@ def test_cross_seed_variance_reports_cv():
 
 
 def test_pca_spectrum_explains_low_rank_data():
-    from autotokamak.eval.diagnostics import pca_spectrum
+    from autotokamak.surrogate.diagnostics import pca_spectrum
 
     bundle = _synthetic_bundle()
     out = pca_spectrum(bundle, max_components=8)
@@ -70,9 +70,9 @@ def test_pca_spectrum_explains_low_rank_data():
 
 def test_residual_structure_after_real_fit(tmp_path):
     """End-to-end: train a real winner via automl, then probe residuals."""
-    from autotokamak.eval.data import kfold
-    from autotokamak.eval.diagnostics import residual_structure
-    from autotokamak.surrogate import automl
+    from autotokamak.surrogate.dataset import kfold
+    from autotokamak.surrogate.diagnostics import residual_structure
+    from autotokamak.surrogate import optuna_search as automl
     from autotokamak.surrogate.schema import SearchSpec
     from autotokamak.surrogate.zoo import DEFAULT_SEARCH_SPACES
 
@@ -107,7 +107,7 @@ def test_residual_structure_after_real_fit(tmp_path):
 
 
 def test_edge_hit_summary_collates_per_model():
-    from autotokamak.eval.diagnostics import edge_hit_summary
+    from autotokamak.surrogate.diagnostics import edge_hit_summary
     from autotokamak.surrogate.schema import (
         ModelStudyResult,
         SearchSpec,

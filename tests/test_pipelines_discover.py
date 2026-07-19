@@ -1,4 +1,4 @@
-"""Regression tests for autotokamak.eval.discover.
+"""Regression tests for autotokamak.pipelines.discover.
 
 These lock the behavior that broke the HTML report's plots: the meta-loop
 workspace layout (winner.pkl at root, datasets/ subdir, grown iterN pools) must
@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 
-from autotokamak.eval.discover import (
+from autotokamak.pipelines.discover import (
     find_eval_dataset,
     find_report,
     find_training_dataset,

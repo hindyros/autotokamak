@@ -3,7 +3,7 @@
 # Run with:
 #   set -a && source .env && set +a
 #   source venv/bin/activate
-#   PYTHONPATH=src/autotokamak python -m agent.runners.meta_loop \
+#   python -m autotokamak.agent.runners.meta_loop \
 #       --config src/autotokamak/agent/prompts/surrogate_meta.yaml
 #
 # This prompt is NOT consumed by plan_execute*; it is consumed by the new

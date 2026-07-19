@@ -12,8 +12,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from autotokamak.eval.data import DatasetBundle, kfold
-from autotokamak.eval.metrics import (
+from autotokamak.surrogate.dataset import DatasetBundle, kfold
+from autotokamak.surrogate.metrics import (
     baseline_mean_predictor_rmse,
     pearson_r,
     pixelwise_max_err,
@@ -24,7 +24,7 @@ from autotokamak.eval.metrics import (
     summarize_psi_errors,
     within_rel_tolerance,
 )
-from autotokamak.eval.reduce import fit_pca, inverse_transform, transform
+from autotokamak.surrogate.reduce import fit_pca, inverse_transform, transform
 
 
 # ---------------- fixtures ----------------
@@ -127,7 +127,7 @@ def test_run_study_minimal_two_models(tmp_path: Path):
     """End-to-end Optuna study + refit on synthetic data; tests every
     code path in automl.run_study + refit_winner + predict_with_winner.
     """
-    from autotokamak.surrogate import automl
+    from autotokamak.surrogate import optuna_search as automl
     from autotokamak.surrogate.schema import SearchSpec
     from autotokamak.surrogate.zoo import DEFAULT_SEARCH_SPACES
 

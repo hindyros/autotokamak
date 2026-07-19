@@ -32,7 +32,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from autotokamak.eval.discover import find_report  # noqa: E402
+from autotokamak.pipelines.discover import find_report  # noqa: E402
 
 # Short, stable colors per action so the same action reads the same across runs.
 _ACTION_COLOR = {

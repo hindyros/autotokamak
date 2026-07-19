@@ -226,7 +226,7 @@ def test_meta_loop_creates_frozen_shard_and_honest_report(meta_config_yaml: Path
         assert "best_rmse_so_far" in pi["state_summary"]
 
     # Shard + train pool are disjoint and load cleanly.
-    from autotokamak.eval.data import load_dataset
+    from autotokamak.surrogate.dataset import load_dataset
 
     shard = load_dataset(ws / "datasets" / "test_shard.h5")
     pool = load_dataset(ws / "datasets" / "train_pool.h5")
@@ -299,10 +299,10 @@ def test_refit_winner_on_pool_gives_regen_immediate_credit(tmp_path: Path):
     from tests.conftest import make_synthetic_h5
 
     from autotokamak.agent.orchestrator.actions import MetaState, _refit_winner_on_pool
-    from autotokamak.eval.data import load_dataset
-    from autotokamak.eval.metrics import psi_rmse
-    from autotokamak.eval.reduce import fit_pca, transform
-    from autotokamak.surrogate.automl import predict_with_winner
+    from autotokamak.surrogate.dataset import load_dataset
+    from autotokamak.surrogate.metrics import psi_rmse
+    from autotokamak.surrogate.reduce import fit_pca, transform
+    from autotokamak.surrogate.optuna_search import predict_with_winner
     from autotokamak.surrogate.zoo import make_model
 
     pool = make_synthetic_h5(tmp_path / "pool.h5", n=16, seed=0)
@@ -369,8 +369,8 @@ def _stub_winner_workspace(sub_ws: Path, shard_h5: Path) -> None:
     The estimator is a real poly_ridge fit on the shard itself so
     predict_with_winner works when the meta loop evaluates it.
     """
-    from autotokamak.eval.data import load_dataset
-    from autotokamak.eval.reduce import fit_pca, transform
+    from autotokamak.surrogate.dataset import load_dataset
+    from autotokamak.surrogate.reduce import fit_pca, transform
     from autotokamak.surrogate.zoo import make_model
 
     shard = load_dataset(shard_h5)
@@ -628,7 +628,7 @@ def test_extend_search_codegen_dispatch(tmp_path: Path, monkeypatch):
         invoked["config_path"] = config_path
         invoked["workspace"] = workspace_override
 
-    import agent.runners.plan_execute_feedback as pef
+    import autotokamak.agent.runners.plan_execute_feedback as pef
 
     monkeypatch.setattr(pef, "main", fake_feedback_main)
 

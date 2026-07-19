@@ -5,7 +5,6 @@ ursa mode: hybrid — meta-agent decisions via DSPy, nested Phase-2 via URSA cod
 """
 from __future__ import annotations
 
-import sys
 import time
 from pathlib import Path
 from typing import Optional
@@ -40,8 +39,8 @@ def run_meta(
     out_dir = resolve_output_dir("meta", mode)
     phase2_mode = "structured" if mode == "fast" else "codegen"
 
-    sys.path.insert(0, str(REPO_ROOT / "src" / "autotokamak"))
-    from agent.runners.meta_loop import run as meta_run  # type: ignore[import-not-found]
+    # Import lazily — URSA/langchain not available at module load time
+    from autotokamak.agent.runners.meta_loop import run as meta_run
 
     prompt_path = REPO_ROOT / "src/autotokamak/agent/prompts/surrogate_meta.yaml"
 

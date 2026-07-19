@@ -9,15 +9,12 @@ SUBMODULES = [
     "autotokamak.core.geometry",
     "autotokamak.core.solver",
     "autotokamak.core.io",
-    "autotokamak.core.diagnostics",
-    "autotokamak.core.logging",
     "autotokamak.core.schema",
     "autotokamak.agent",
     "autotokamak.agent.runners",
     "autotokamak.agent.runners.config",
     "autotokamak.data",
-    "autotokamak.models",
-    "autotokamak.eval",
+    "autotokamak.pipelines",
     "autotokamak.surrogate",
 ]
 

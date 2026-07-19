@@ -4,7 +4,7 @@
 # Run with the venv activated and .env loaded:
 #   set -a && source .env && set +a
 #   source venv/bin/activate
-#   PYTHONPATH=src/autotokamak python -m agent.runners.plan_execute_feedback \
+#   python -m autotokamak.agent.runners.plan_execute_feedback \
 #       --config src/autotokamak/agent/prompts/dataset_generation.yaml
 #
 # Scope: fixed-boundary Grad-Shafranov, TokaMaker default profiles,

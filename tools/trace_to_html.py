@@ -1038,7 +1038,7 @@ def _build_dataset_provenance(workspace: Path) -> dict | None:
     import sys as _sys
     _sys.path.insert(0, str(REPO_ROOT / "src"))
     try:
-        from autotokamak.eval.data import PARAM_ORDER, load_dataset
+        from autotokamak.surrogate.dataset import PARAM_ORDER, load_dataset
     except Exception:  # noqa: BLE001
         return None
     candidates = [workspace / "dataset.h5", workspace / "outputs" / "dataset.h5"]

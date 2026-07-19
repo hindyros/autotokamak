@@ -24,7 +24,7 @@ problem: |
     * Do NOT write into the ./ursa/ or ./OpenFusionToolkit/. directory, treat it as read-only.
     * Do not use the 'git' command for ANYTHING.
     * Do not create or modify the python environment - there should be no need
-      to install any packages, remove environments, etc, everything from requirements.txt is installed. 
+      to install any packages, remove environments, etc, all needed packages are already installed (see pyproject.toml). 
     * You are already running within a python environment that has URSA, so you
       do not need to install the one in ./ursa/
     * You already have the OpenFusionToolkit binary installed and the python path has already been added, no need to validate, the python imports for OpenFusionToolkit work. 

@@ -85,8 +85,8 @@ def test_automl_loop_run_then_terminate(tmp_path: Path):
     # Winner predicts shard-shaped output.
     import joblib
 
-    from autotokamak.surrogate.automl import predict_with_winner
-    from autotokamak.eval.data import load_dataset
+    from autotokamak.surrogate.optuna_search import predict_with_winner
+    from autotokamak.surrogate.dataset import load_dataset
 
     payload = joblib.load(outputs / "winner.pkl")
     shard_bundle = load_dataset(shard)

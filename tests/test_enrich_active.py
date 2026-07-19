@@ -61,7 +61,7 @@ def test_enrich_active_dispatch(tmp_path: Path, monkeypatch):
     assert json.loads(acq_json.read_text())["n_selected"] == 5
 
     # Merged pool loads cleanly and has grown.
-    from autotokamak.eval.data import load_dataset
+    from autotokamak.surrogate.dataset import load_dataset
 
     assert load_dataset(merged).n_samples == 16 + 5
 
@@ -87,7 +87,7 @@ def test_enrich_active_refits_winner(tmp_path: Path, monkeypatch):
     from autotokamak.agent.orchestrator import actions
     from autotokamak.agent.orchestrator.actions import MetaState, enrich_active
     from autotokamak.agent.orchestrator.schema import EnrichActivePayload
-    from autotokamak.eval.data import load_dataset
+    from autotokamak.surrogate.dataset import load_dataset
 
     pool = make_synthetic_h5(tmp_path / "pool.h5", n=16, seed=0)
     shard = make_synthetic_h5(tmp_path / "shard.h5", n=4, seed=9)

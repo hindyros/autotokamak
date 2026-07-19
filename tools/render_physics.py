@@ -27,8 +27,8 @@ import numpy as np
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from autotokamak.eval.data import PARAM_ORDER, load_dataset
-from autotokamak.eval.discover import find_training_dataset
+from autotokamak.surrogate.dataset import PARAM_ORDER, load_dataset
+from autotokamak.pipelines.discover import find_training_dataset
 
 
 def _find_dataset(workspace: Path) -> Path | None:
@@ -36,7 +36,7 @@ def _find_dataset(workspace: Path) -> Path | None:
 
     Handles both direct phase workspaces (``dataset.h5`` / ``outputs/dataset.h5``)
     and meta-loop workspaces (``datasets/train_pool.h5`` and the grown
-    ``datasets/iterN_dataset.h5`` pools). See ``autotokamak.eval.discover``.
+    ``datasets/iterN_dataset.h5`` pools). See ``autotokamak.pipelines.discover``.
     """
     return find_training_dataset(workspace)
 

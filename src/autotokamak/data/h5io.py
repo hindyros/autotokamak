@@ -155,7 +155,7 @@ def split_h5(
 
     The test shard is sampled from ``success == True`` rows only (a test
     sample must be evaluable); every other row — including failures — stays
-    in the train pool, where ``eval.data.load_dataset`` filters them as
+    in the train pool, where ``autotokamak.surrogate.dataset.load_dataset`` filters them as
     usual. Both output files use the canonical layout, so ``load_dataset``
     round-trips on either.
 

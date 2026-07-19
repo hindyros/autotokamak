@@ -1,7 +1,7 @@
 """Evaluate a trained surrogate and dump diagnostic plots.
 
 Usage:
-    python tools/eval_surrogate.py                       # workspace=examples/surrogate_automl
+    python tools/eval_surrogate.py                       # workspace=examples/surrogate_meta
     python tools/eval_surrogate.py --workspace <path>    # custom workspace
     python tools/eval_surrogate.py --out <dir>           # custom output dir
 
@@ -37,15 +37,15 @@ import numpy as np
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from autotokamak.eval.data import kfold, load_dataset
-from autotokamak.eval.discover import (
+from autotokamak.surrogate.dataset import kfold, load_dataset
+from autotokamak.pipelines.discover import (
     find_eval_dataset,
     find_report,
     find_winner,
 )
-from autotokamak.eval.metrics import baseline_mean_predictor_rmse, psi_rmse
-from autotokamak.eval.reduce import inverse_transform, transform
-from autotokamak.surrogate.automl import predict_with_winner
+from autotokamak.surrogate.metrics import baseline_mean_predictor_rmse, psi_rmse
+from autotokamak.surrogate.reduce import inverse_transform, transform
+from autotokamak.surrogate.optuna_search import predict_with_winner
 
 
 def _find_study_db(workspace: Path) -> Path | None:
@@ -66,7 +66,7 @@ def _load_run(workspace: Path):
 
     The eval dataset is the winner's held-out set (the meta-loop's frozen shard
     when present), so true-vs-predicted plots stay honest. See
-    ``autotokamak.eval.discover``.
+    ``autotokamak.pipelines.discover``.
     """
     winner_path = find_winner(workspace)
     if winner_path is None:
@@ -345,7 +345,7 @@ def _summary(workspace, payload, bundle, splits, report):
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--workspace", default=str(REPO_ROOT / "examples/surrogate_automl"))
+    ap.add_argument("--workspace", default=str(REPO_ROOT / "examples/surrogate_meta"))
     ap.add_argument("--out", default=None, help="Output dir (default: <workspace>/outputs/eval_plots)")
     args = ap.parse_args()
 

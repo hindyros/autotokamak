@@ -8,8 +8,8 @@ For repo structure, setup, and code conventions, see [`CLAUDE.md`](../CLAUDE.md)
 
 > **What has shipped since this agenda was written (2026-07):** several items below are
 > now implemented and no longer open questions.
-> - **Unified pipelines CLI** — `python -m autotokamak.pipelines <phase1|phase2|meta> --mode <fast|ursa>` is the primary entry point; the "planned prompt pipeline" ASCII flow further down is superseded by it (and the prompts `dataset_explore.yaml` / `surrogate_baseline.yaml` / `benchmark_report.yaml` in that flow were never created).
-> - **Phase-2** is implemented as structured AutoML in `src/autotokamak/surrogate/` (`automl_loop.py`, `automl.py`, `zoo.py`, `schema.py`) — the "A/B/C variant" question is resolved in code.
+> - **Unified pipelines CLI** — `python -m autotokamak.pipelines <phase1|phase2|meta> --mode <fast|ursa>` is the primary entry point (§4 shows the pipeline as actually built).
+> - **Phase-2** is implemented as structured AutoML in `src/autotokamak/surrogate/` (`automl_loop.py`, `optuna_search.py`, `zoo.py`, `schema.py`) — the "A/B/C variant" question is resolved in code.
 > - **Meta-loop** — `agent/runners/meta_loop.py` (+ `pipelines meta`) is the autonomous Phase-1 → Phase-2 outer loop.
 > - **Active learning** — `data/acquire.py` + `data/envelope.py` provide residual-driven acquisition and envelope evaluation (the meta-loop's `enrich_active` action).
 > - Week-2/Week-4 milestones (sweeps/HDF5, surrogates) below are done; treat the weekly plan as historical.
@@ -84,23 +84,21 @@ There are three plausible architectures for how the AutoML loop itself works. Th
 
 ---
 
-## 4. Prompt pipeline (planned)
+## 4. Pipeline (as built)
 
-Each prompt YAML produces a concrete checkpointed artifact the next one consumes:
+Each stage produces a concrete checkpointed artifact the next one consumes.
+(The originally planned `dataset_explore` / `surrogate_baseline` /
+`benchmark_report` prompts were never needed and were dropped.)
 
 ```
-dataset_generation.yaml   →  outputs/dataset.h5                             [Phase 1]
+pipelines phase1  (dataset_generation.yaml in ursa mode)  →  dataset.h5          [Phase 1]
    ↓
-dataset_explore.yaml      →  EDA report + train/val/test split              [optional]
-   ↓
-surrogate_baseline.yaml   →  one trained model per candidate, defaults
-   ↓
-surrogate_automl.yaml     →  hyperparameter search + winner selection       [Phase 2 core]
-   ↓
-benchmark_report.yaml     →  final comparison report                        [optional]
+pipelines phase2  (surrogate_automl.yaml in ursa mode)    →  winner + report     [Phase 2]
+   ↺
+pipelines meta    (surrogate_meta.yaml)                   →  self-improving loop over both
 ```
 
-**Two design notes to fold into the surrogate prompts when they're written:**
+**Two design notes already folded into the surrogate prompts:**
 
 1. ψ is high-dimensional — 96 × 128 ≈ 12 k outputs per sample. Direct GP regression on 12 k targets is not feasible. The surrogate prompts must instruct the agent to do SVD/PCA reduction first, regress in the reduced space, and reconstruct. Equilibrium ψ datasets are typically very low-rank (95 % variance in < 20 components).
 2. "Simple MLP" must be capped explicitly in the prompt (sklearn `MLPRegressor`, ≤ 2 hidden layers, ≤ 256 units), or the agent will reach for PyTorch and the line between "classical" and "deep" disappears.

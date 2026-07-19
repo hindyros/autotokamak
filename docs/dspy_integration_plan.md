@@ -148,7 +148,7 @@ pytest tests/ -v
 ./tools/collect_traces.sh --n 15 --model openai:gpt-5-mini
 
 # 3. Run GEPA (~$10-50 in optimization compute)
-PYTHONPATH=src/autotokamak python -m autotokamak.agent.dspy.optimize_meta \
+python -m autotokamak.agent.dspy.optimize_meta \
     --experiments-dir experiments/ \
     --output src/autotokamak/agent/dspy/optimized/meta_picker.json \
     --auto medium

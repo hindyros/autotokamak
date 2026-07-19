@@ -16,12 +16,11 @@ code). See [Running the platform](#running-the-platform) below.
 
 ## Documentation
 
-- [docs/architecture.md](docs/architecture.md) — high-level layering and data flow.
+- [docs/architecture.md](docs/architecture.md) — layer map, data flow, and development conventions.
 - [docs/agent-workflows.md](docs/agent-workflows.md) — how runners and prompts work.
 - [docs/examples.md](docs/examples.md) — how to run and interpret example workspaces.
 - [docs/configs.md](docs/configs.md) — agent task YAML vs simulation config YAML.
 - [docs/glossary.md](docs/glossary.md) — beginner-friendly definitions of core terms.
-- [docs/development-notes.md](docs/development-notes.md) — migration notes and conventions.
 
 ---
 

@@ -278,7 +278,7 @@ class MetaReport(BaseModel):
     target_worst_cell_accuracy_pct: Optional[float] = None
     final_worst_cell_accuracy_pct: Optional[float] = None
     # Which eval-set mode the run used, and (envelope mode) the winner's
-    # per-geometry-cell breakdown from eval.metrics.per_cell_errors.
+    # per-geometry-cell breakdown from surrogate.metrics.per_cell_errors.
     eval_mode: Optional[Literal["envelope", "seed_shard"]] = None
     eval_per_cell: Optional[Dict[str, Any]] = None
     test_shard_path: Optional[str] = None

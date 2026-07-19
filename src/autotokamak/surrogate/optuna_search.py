@@ -18,9 +18,9 @@ from typing import Any
 
 import numpy as np
 
-from autotokamak.eval.data import DatasetBundle, Splits
-from autotokamak.eval.metrics import psi_rmse
-from autotokamak.eval.reduce import PCAModel, fit_pca, inverse_transform, transform
+from autotokamak.surrogate.dataset import DatasetBundle, Splits
+from autotokamak.surrogate.metrics import psi_rmse
+from autotokamak.surrogate.reduce import PCAModel, fit_pca, inverse_transform, transform
 from autotokamak.surrogate.schema import (
     ModelSpec,
     ModelStudyResult,

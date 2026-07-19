@@ -135,8 +135,6 @@ def test_phase1_fast_calls_run_sweep(tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_meta_fast_passes_structured_mode(tmp_path):
-    from autotokamak.pipelines._common import REPO_ROOT as PR
-
     fake_report = SimpleNamespace(
         n_iterations=1,
         terminated_by="iterations_cap",
@@ -145,37 +143,18 @@ def test_meta_fast_passes_structured_mode(tmp_path):
         winner_model_name="poly_ridge",
     )
 
+    calls = []
+
+    def fake_run(**kwargs):
+        calls.append(kwargs)
+        return fake_report
+
     with (
         patch("autotokamak.pipelines.meta.resolve_output_dir", return_value=tmp_path),
-        patch("autotokamak.pipelines.meta.sys") as mock_sys,
+        patch("autotokamak.agent.runners.meta_loop.run", side_effect=fake_run),
     ):
-        # Patch the import of meta_run inside the function
-        import autotokamak.pipelines.meta as meta_module
-        with patch.object(meta_module, "__builtins__", __builtins__):
-            pass  # just ensure it imports
-
-        # Directly test that phase2_mode_override is "structured" for mode=fast
-        calls = []
-
-        def fake_run(**kwargs):
-            calls.append(kwargs)
-            return fake_report
-
-        with (
-            patch("autotokamak.pipelines.meta.resolve_output_dir", return_value=tmp_path),
-        ):
-            import importlib, types
-            # Inject a fake agent.runners.meta_loop into sys.modules
-            fake_meta_loop_module = types.ModuleType("agent.runners.meta_loop")
-            fake_meta_loop_module.run = fake_run  # type: ignore[attr-defined]
-
-            import sys as _sys
-            _sys.modules["agent.runners.meta_loop"] = fake_meta_loop_module
-
-            from autotokamak.pipelines.meta import run_meta
-            run_meta(mode="fast", max_iterations=1, time_budget=120)
-
-            del _sys.modules["agent.runners.meta_loop"]
+        from autotokamak.pipelines.meta import run_meta
+        run_meta(mode="fast", max_iterations=1, time_budget=120)
 
     assert len(calls) == 1
     assert calls[0]["phase2_mode_override"] == "structured"
@@ -196,16 +175,12 @@ def test_meta_ursa_passes_codegen_mode(tmp_path):
         calls.append(kwargs)
         return fake_report
 
-    import sys as _sys, types
-    fake_meta_loop_module = types.ModuleType("agent.runners.meta_loop")
-    fake_meta_loop_module.run = fake_run  # type: ignore[attr-defined]
-    _sys.modules["agent.runners.meta_loop"] = fake_meta_loop_module
-
-    with patch("autotokamak.pipelines.meta.resolve_output_dir", return_value=tmp_path):
+    with (
+        patch("autotokamak.pipelines.meta.resolve_output_dir", return_value=tmp_path),
+        patch("autotokamak.agent.runners.meta_loop.run", side_effect=fake_run),
+    ):
         from autotokamak.pipelines.meta import run_meta
         run_meta(mode="ursa", max_iterations=1, time_budget=120)
-
-    del _sys.modules["agent.runners.meta_loop"]
 
     assert len(calls) == 1
     assert calls[0]["phase2_mode_override"] == "codegen"

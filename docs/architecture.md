@@ -6,16 +6,17 @@ TokaMaker simulations.
 
 It is organized into these layers:
 
-1. **`autotokamak.core`** — shared library of geometry, solver, I/O, diagnostics, schema, and logging utilities used by every higher layer.
-2. **`autotokamak.pipelines`** — the unified `phase1 | phase2 | meta` CLI (`--mode fast|ursa`); the primary entry point that orchestrates everything below.
+1. **`autotokamak.core`** — shared library of geometry, solver, I/O, and schema utilities used by every higher layer.
+2. **`autotokamak.pipelines`** — the unified `phase1 | phase2 | meta` CLI (`--mode fast|ursa`); the primary entry point that orchestrates everything below. Also home of `discover.py`, which locates a run's artifacts for the `tools/` scripts.
 3. **Data layer** (`autotokamak.data`) — parameter-sweep dataset generation, HDF5 I/O, and active-learning acquisition + envelope evaluation.
-4. **Surrogate layer** (`autotokamak.surrogate`) — structured Phase-2 AutoML: an Optuna model zoo plus the outer search loop.
+4. **Surrogate layer** (`autotokamak.surrogate`) — everything surrogate training: dataset loading/splitting (`dataset`), PCA reduction (`reduce`), metrics, the sklearn model zoo (`zoo`), the Optuna inner loop (`optuna_search`), the LLM-driven outer search loop (`automl_loop`), and run diagnostics for the meta-agent (`diagnostics`).
 5. **Agent orchestration layer** (`src/autotokamak/agent/`) — URSA runners, the meta-loop, DSPy pickers, and the orchestrator.
 6. **Runnable simulation examples layer** (`examples/`) — hand-runnable OFT workflows and generated agent workspaces.
-7. **Evaluation layer** (`autotokamak.eval`) — metrics, diagnostics, and PCA reduction.
 
-`models/` is reserved for trained-model loaders and is still largely a stub; the active
-surrogate model zoo lives in `autotokamak.surrogate.zoo`.
+Two example workspaces carry easily-confused names: `examples/surrogate_automl/`
+is the **standalone Phase-2** AutoML workspace, while `examples/surrogate_meta/`
+is the **meta-loop** workspace (which runs Phase-2 rounds internally). They are
+distinct pipelines, not two names for one thing.
 
 ## Layer Boundaries
 
@@ -86,9 +87,22 @@ flowchart TD
 | `geometry` | `build_lcfs`, `build_mesh`, `build_mesh_from_config` | Both example runners; future data sweeps |
 | `solver` | `make_solver`, `solve_equilibrium` (retry-on-isoflux-fail) | `config_driven_equilibrium` runner; future surrogate evaluation |
 | `io` | `atomic_write_text`, `atomic_savez`, `unified_output_dir`, `utc_run_id` | All runners that write artifacts |
-| `diagnostics` | `extract_scalars` | Summary generation, eval metrics |
-| `logging` | `log`, `section`, `kv` (libc-flushed) | All runners; keeps OFT compiled output in order |
-| `schema` | `EquilibriumConfig`, `SweepConfig`, `InvertConfig` (Pydantic v2, `from_yaml`) | Config validation; sweep + pipeline tooling |
+| `schema` | `EquilibriumConfig` (Pydantic v2, `from_yaml`) | Single-run config validation. Dataset sweeps use `autotokamak.data.schema.SweepConfig`. |
+
+## Development conventions
+
+- All package code imports via the full `autotokamak.…` namespace (e.g.
+  `autotokamak.agent.runners.plan_execute`). The historical bare `agent.…`
+  namespace and its `PYTHONPATH=src/autotokamak` hack are gone.
+- Do not modify side clones `OpenFUSIONToolkit/` and `ursa/`.
+- Keep prompt `workspace:` values aligned with paths under `examples/`.
+- The `pipelines/` layer deliberately unifies the agent and simulation phases
+  behind one CLI; keep phase-specific logic in `data/`, `surrogate/`, and
+  `agent/runners/` rather than in the thin CLI wrappers.
+- Historical renames (for archaeology): `oft_generation_example/` →
+  `examples/fixed_boundary/`, `oft_discretization_example/` →
+  `examples/config_driven_equilibrium/`, flat `agent/*.py` →
+  `agent/runners/*.py`.
 
 ## OFT singleton constraint
 

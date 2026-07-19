@@ -33,15 +33,15 @@ from autotokamak.agent.orchestrator.schema import (
     MetaReport,
 )
 from autotokamak.data.schema import SweepConfig
-from autotokamak.eval.data import kfold, load_dataset
-from autotokamak.eval.metrics import (
+from autotokamak.surrogate.dataset import kfold, load_dataset
+from autotokamak.surrogate.metrics import (
     baseline_mean_prediction,
     baseline_mean_predictor_rmse,
     per_cell_errors,
 )
 
-from agent.runners.config import REPO_ROOT, resolve_workspace
-from agent.runners.trace import RunTrace
+from autotokamak.agent.runners.config import REPO_ROOT, resolve_workspace
+from autotokamak.agent.runners.trace import RunTrace
 
 load_dotenv(REPO_ROOT / ".env")
 
@@ -409,7 +409,7 @@ def _per_cell_breakdown(
     Never raises — a failed predict degrades to None so the loop keeps
     running. Only meaningful when ``setup.per_cell_enabled``.
     """
-    from autotokamak.surrogate.automl import predict_with_winner
+    from autotokamak.surrogate.optuna_search import predict_with_winner
 
     try:
         pred = predict_with_winner(winner_payload, shard_bundle.inputs)
@@ -469,7 +469,7 @@ def _per_cell_baseline(
 
 def _initial_diagnostics(state: MetaState) -> dict:
     """Cheap diagnostics that don't require an existing winner."""
-    from autotokamak.eval import diagnostics as diag_mod
+    from autotokamak.surrogate import diagnostics as diag_mod
     from autotokamak.surrogate.zoo import make_poly_ridge
 
     bundle = load_dataset(state.current_dataset_h5)
@@ -479,7 +479,7 @@ def _initial_diagnostics(state: MetaState) -> dict:
 
 def _diagnostics_with_winner(state: MetaState) -> dict:
     """Full diagnostics including residual structure (requires a winner)."""
-    from autotokamak.eval import diagnostics as diag_mod
+    from autotokamak.surrogate import diagnostics as diag_mod
     from autotokamak.surrogate.zoo import make_poly_ridge
 
     bundle = load_dataset(state.current_dataset_h5)

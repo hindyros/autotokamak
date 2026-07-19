@@ -23,7 +23,7 @@ Method (each piece is standard; the composition is fitted to this repo):
 
 1. **PCA-GP emulator** (Higdon et al. 2008, JASA — high-dimensional-output
    computer-model emulation): project ψ(R,Z) onto its leading PCA
-   components (reusing ``eval.reduce.fit_pca``) and fit one Gaussian
+   components (reusing ``surrogate.reduce.fit_pca``) and fit one Gaussian
    Process with an ARD RBF kernel per retained coefficient. This is an
    *acquisition* model, deliberately independent of the Phase-2 winner —
    the winner may be a kernel-ridge/MLP with no uncertainty at all.
@@ -443,7 +443,7 @@ def select_acquisition_points(
         fallback_reason = "space_filling strategy requested (maximin, no error model)"
     elif n_success >= MIN_SUCCESS_FOR_GP:
         try:
-            from autotokamak.eval.reduce import fit_pca, transform
+            from autotokamak.surrogate.reduce import fit_pca, transform
 
             n_comp = int(min(max_pca_components, n_success - 1))
             pca = fit_pca(psi_succ, n_components=n_comp)
@@ -541,7 +541,7 @@ def _oof_residuals(
     in the val fold. This is the honest "observed model performance" signal:
     train-set residuals of GP/KRR interpolators are ~0 by construction.
     """
-    from autotokamak.eval.reduce import fit_pca, inverse_transform, transform
+    from autotokamak.surrogate.reduce import fit_pca, inverse_transform, transform
     from autotokamak.surrogate.zoo import make_model
 
     n = X_succ.shape[0]

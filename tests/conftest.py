@@ -86,7 +86,7 @@ def fake_run_sweep_factory(calls: dict, *, expect_X: bool = True):
 
 def train_winner(X: np.ndarray, psi: np.ndarray, n_comp: int = 2) -> dict:
     """Fit a tiny poly_ridge winner payload on (X, psi) — the automl output shape."""
-    from autotokamak.eval.reduce import fit_pca, transform
+    from autotokamak.surrogate.reduce import fit_pca, transform
     from autotokamak.surrogate.zoo import make_model
 
     pca = fit_pca(psi, n_components=n_comp)

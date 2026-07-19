@@ -97,9 +97,9 @@ def run_automl_loop(
     any round ran — the caller decides what a winnerless search means.
     """
     from autotokamak.core.io import atomic_write_text
-    from autotokamak.eval.data import kfold, load_dataset
-    from autotokamak.eval.metrics import baseline_mean_predictor_rmse, psi_rmse
-    from autotokamak.surrogate.automl import (
+    from autotokamak.surrogate.dataset import kfold, load_dataset
+    from autotokamak.surrogate.metrics import baseline_mean_predictor_rmse, psi_rmse
+    from autotokamak.surrogate.optuna_search import (
         predict_with_winner,
         refit_winner,
         run_study,

@@ -1,7 +1,7 @@
 """Tests for the residual-driven active-learning stack.
 
 Covers the four new pieces (design doc ``docs/active_learning_design.md``):
-  - ``eval.metrics.per_cell_errors``   — stratified per-geometry-cell RMSE
+  - ``surrogate.metrics.per_cell_errors``   — stratified per-geometry-cell RMSE
   - ``data.envelope``                  — frozen target-envelope eval set
   - ``data.acquire`` residual path     — OOF-residual UCB acquisition
   - ``enrich_active`` wiring           — winner + envelope bounds threaded in
@@ -48,7 +48,7 @@ def _import_meta_run():
 
 
 def test_per_cell_errors_finds_worst_cell():
-    from autotokamak.eval.metrics import per_cell_errors
+    from autotokamak.surrogate.metrics import per_cell_errors
 
     rng = np.random.default_rng(0)
     n = 64
@@ -77,7 +77,7 @@ def test_per_cell_errors_finds_worst_cell():
 
 
 def test_per_cell_errors_perfect_prediction():
-    from autotokamak.eval.metrics import per_cell_errors
+    from autotokamak.surrogate.metrics import per_cell_errors
 
     rng = np.random.default_rng(1)
     inputs = rng.uniform(size=(16, 5))
@@ -264,7 +264,7 @@ def test_enrich_active_uses_residual_path_with_winner(tmp_path: Path, monkeypatc
     from autotokamak.agent.orchestrator import actions
     from autotokamak.agent.orchestrator.actions import MetaState, enrich_active
     from autotokamak.agent.orchestrator.schema import EnrichActivePayload
-    from autotokamak.eval.data import load_dataset
+    from autotokamak.surrogate.dataset import load_dataset
 
     pool = make_synthetic_h5(tmp_path / "pool.h5", n=24, seed=0)
     shard = make_synthetic_h5(tmp_path / "shard.h5", n=4, seed=9)
@@ -366,7 +366,7 @@ def test_select_from_dataset_strategy_dispatch(tmp_path: Path):
     from tests.conftest import make_synthetic_h5
 
     from autotokamak.data.acquire import select_from_dataset
-    from autotokamak.eval.data import load_dataset
+    from autotokamak.surrogate.dataset import load_dataset
 
     pool = make_synthetic_h5(tmp_path / "pool.h5", n=24, seed=0)
     bundle = load_dataset(pool)
@@ -402,7 +402,7 @@ def test_enrich_active_respects_strategy(tmp_path: Path, monkeypatch):
     from autotokamak.agent.orchestrator import actions
     from autotokamak.agent.orchestrator.actions import MetaState, enrich_active
     from autotokamak.agent.orchestrator.schema import EnrichActivePayload
-    from autotokamak.eval.data import load_dataset
+    from autotokamak.surrogate.dataset import load_dataset
 
     pool = make_synthetic_h5(tmp_path / "pool.h5", n=24, seed=0)
     calls: dict = {}
@@ -529,7 +529,7 @@ def test_worst_cell_accuracy_stops_loop_early(tmp_path: Path, monkeypatch):
     from tests.conftest import make_synthetic_h5
 
     from autotokamak.agent.orchestrator import actions
-    from autotokamak.eval.data import load_dataset
+    from autotokamak.surrogate.dataset import load_dataset
 
     # A large initial pool + envelope eval on the SAME synthetic generator, so
     # a well-fit winner has low per-cell error everywhere.

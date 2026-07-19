@@ -47,6 +47,19 @@ Quick run:
 python -m autotokamak.pipelines phase1 --mode fast --n-samples 500
 ```
 
+## `examples/surrogate_automl`
+
+Purpose:
+- Standalone Phase-2 workspace (created on first `pipelines phase2` run; not
+  committed). Distinct from `surrogate_meta` below: this is one AutoML search
+  over an existing dataset, not the self-improving loop.
+
+Quick run:
+
+```bash
+python -m autotokamak.pipelines phase2 --mode fast --time-budget 600
+```
+
 ## `examples/surrogate_meta`
 
 Purpose:
