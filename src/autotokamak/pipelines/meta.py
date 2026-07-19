@@ -6,6 +6,7 @@ ursa mode: hybrid — meta-agent decisions via DSPy, nested Phase-2 via URSA cod
 from __future__ import annotations
 
 import sys
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -25,6 +26,8 @@ def run_meta(
     model: Optional[str] = None,
     dataset: Optional[str] = None,
     target_rmse: Optional[float] = None,
+    target_accuracy_pct: Optional[float] = None,
+    target_worst_cell_accuracy_pct: Optional[float] = None,
 ) -> dict:
     """Dispatch the meta-loop in either fast or ursa mode.
 
@@ -44,6 +47,7 @@ def run_meta(
 
     print(f"[meta/{mode}] Output: {out_dir}  phase2_mode={phase2_mode}")
 
+    started = time.time()
     report = meta_run(
         config_path=str(prompt_path),
         workspace_override=str(out_dir),
@@ -53,18 +57,24 @@ def run_meta(
         phase2_time_budget_override=time_budget,
         model_override=model,
         target_rmse_override=target_rmse,
+        target_accuracy_pct_override=target_accuracy_pct,
+        target_worst_cell_accuracy_pct_override=target_worst_cell_accuracy_pct,
     )
 
+    elapsed = time.time() - started
     manifest_extra = {
+        "elapsed_seconds": round(elapsed, 1),
         "n_iterations": getattr(report, "n_iterations", None),
         "terminated_by": getattr(report, "terminated_by", None),
         "final_rmse": getattr(report, "final_rmse", None),
         "baseline_rmse": getattr(report, "baseline_rmse", None),
+        "final_accuracy_pct": getattr(report, "final_accuracy_pct", None),
+        "final_worst_cell_accuracy_pct": getattr(report, "final_worst_cell_accuracy_pct", None),
         "winner_model_name": getattr(report, "winner_model_name", None),
         "phase2_mode": phase2_mode,
         "max_iterations": max_iterations,
         "time_budget_seconds": time_budget,
     }
     p = write_manifest(out_dir, pipeline="meta", mode=mode, **manifest_extra)
-    print(f"[meta/{mode}] Done — manifest: {p}")
+    print(f"[meta/{mode}] Done in {elapsed:.0f}s — manifest: {p}")
     return manifest_extra

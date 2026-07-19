@@ -13,6 +13,18 @@
 max_iterations: 3
 seed: 0
 
+# Performance stopping criterion. Stop as soon as the winner is at least this
+# percent better than the trivial baseline mean-predictor on the frozen eval
+# set (error reduction = 100*(1 - rmse/baseline)); max_iterations above is the
+# cap when the target is not reached. Omit to run all iterations.
+#   target_accuracy_pct: 90        # stop at 90% error reduction
+# Equivalent lower-level forms (strictest wins if several are set):
+#   target_rmse_ratio: 0.10        # stop when rmse <= 0.10 * baseline
+#   target_rmse: 0.05              # stop at an absolute rmse in psi units
+# Stricter, per-region variant (requires eval_envelope below): stop only once
+# the WEAKEST geometry cell clears the bar vs its own baseline —
+#   target_worst_cell_accuracy_pct: 80    # every region >= 80% error reduction
+
 initial_dataset_h5: examples/dataset_generation/outputs/dataset.h5
 base_sweep_config: examples/dataset_generation/dataset_config.yaml
 phase2_prompt: src/autotokamak/agent/prompts/surrogate_automl.yaml
@@ -24,3 +36,19 @@ model: openai:gpt-5.2
 # "structured" = Optuna + DSPy library calls (fast, no code-gen, default)
 # "codegen"    = URSA PlanningAgent + ExecutionAgent writes the runner from scratch
 phase2_mode: structured
+
+# Target-envelope evaluation (docs/active_learning_design.md §D2). When set,
+# the frozen eval set covers the FULL target envelope (drawn once by LHS +
+# OFT, or a pre-solved h5) instead of a shard carved from the seed dataset,
+# the whole initial dataset becomes train pool, and enrich_active acquires
+# over the envelope bounds. Omit for legacy seed-shard behavior.
+#
+# eval_envelope:
+#   n_eval: 256           # OFT solves for the eval set (one-time cost)
+#   seed: 1234
+#   n_bins: 2             # joint geometry cells per dim for per-cell RMSE
+#   parameters:           # envelope bounds; omitted keys fall back to the
+#     kappa: {low: 1.0, high: 1.8}      # base_sweep_config seed box
+#     delta: {low: 0.0, high: 0.5}
+#   # ... or reuse a pre-solved eval set and skip generation:
+#   # h5: examples/surrogate_meta/datasets/eval_envelope.h5

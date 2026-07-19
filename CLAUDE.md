@@ -15,27 +15,42 @@ It builds on:
 ## Top-level layout
 
 ```
-agentic_simulations/                # repo root (will be renamed to autotokamak)
+autotokamak/                        # repo root
 ├── pyproject.toml                  # package metadata, deps, optional [ml] [dev]
 ├── src/autotokamak/                # the importable package
 │   ├── core/                       # shared utilities (geometry, solver, io, diagnostics, logging, schema)
-│   ├── agent/                      # URSA runners + prompts
-│   │   ├── runners/                # plan_execute.py, plan_execute_feedback.py
-│   │   └── prompts/                # YAML prompts the agent consumes
-│   ├── data/                       # (Week 2) sweep generators, HDF5 loaders
-│   ├── surrogate/                  # (Week 4) PINN, DeepONet, FNO, baselines
-│   ├── models/                     # (Week 4+) trained-model loaders
-│   └── eval/                       # (Week 3+) metrics, benchmarks, comparison plots
-├── examples/                       # runnable demos, now built on autotokamak.core
+│   ├── pipelines/                  # PRIMARY entry point: phase1/phase2/meta CLI (--mode fast|ursa)
+│   ├── agent/                      # URSA runners + prompts + DSPy + orchestrator
+│   │   ├── runners/                # plan_execute, plan_execute_feedback, meta_loop, scoring, trace
+│   │   ├── prompts/                # YAML prompts the agent consumes
+│   │   ├── dspy/                   # DSPy signatures/modules/metrics for the meta + search pickers
+│   │   └── orchestrator/           # meta-loop actions + schema (MetaConfig, EnvelopeConfig)
+│   ├── data/                       # sweep generation, HDF5 io, active-learning acquisition + envelope
+│   ├── surrogate/                  # structured AutoML: automl_loop, automl, zoo, schema (Optuna model zoo)
+│   ├── models/                     # trained-model loaders (still mostly a stub)
+│   └── eval/                       # metrics, diagnostics, reduce (PCA), eval data loaders
+├── examples/                       # runnable demos + generated agent workspaces
 │   ├── fixed_boundary/             # analytic + EQDSK demo (hardcoded physics)
-│   └── config_driven_equilibrium/  # YAML-driven runner + sweep + ψ inverter
-├── tests/                          # pytest suite (smoke + schema + geometry)
+│   ├── config_driven_equilibrium/  # YAML-driven runner + sweep + ψ inverter
+│   ├── dataset_generation/         # Phase-1 workspace (fast/ + ursa/ outputs)
+│   └── surrogate_meta/             # meta-loop workspace (fast/ + ursa/ outputs)
+├── tests/                          # pytest suite (smoke + schema + geometry + e2e mocks)
 ├── data/                           # gitignored: raw/, processed/ for training datasets
 ├── models/                         # gitignored: checkpoints/
 ├── experiments/                    # gitignored: per-experiment configs and logs
 ├── docs/                           # architecture diagrams and design notes
 └── outputs/                        # gitignored: per-run artifacts from example scripts
 ```
+
+The **primary entry point** is the unified pipelines CLI:
+
+```bash
+python -m autotokamak.pipelines <phase1|phase2|meta> --mode <fast|ursa> [opts]
+```
+
+`fast` runs in-process library code; `ursa` has a URSA agent write and run the code.
+Each run writes `examples/<workspace>/<mode>/manifest.json`. The `agent/runners/*`
+modules below are the lower-level building blocks the CLI dispatches to.
 
 ## Two layers of code
 
@@ -46,7 +61,14 @@ These are the **agentic runners** that read a YAML prompt and let URSA do the wo
 |---|---|
 | `runners/plan_execute.py` | Plain plan → execute. PlanningAgent emits steps; ExecutionAgent runs each in turn, threading "previous-step summary" through the prompts. |
 | `runners/plan_execute_feedback.py` | Same, plus a **feedback loop**: after execution, re-invoke the planner with the execution history so it can patch failures. Configurable via `feedback_rounds`, `validate_after`. |
+| `runners/meta_loop.py` | The autonomous **meta-loop**: drives Phase-1 → Phase-2 and, each round, has the LLM pick `regen_dataset` / `extend_search` / `enrich_active` / `terminate`. Backs `pipelines meta`. |
+| `runners/scoring.py` | Shared scorer used to rank rounds / decide early-stop gates. |
+| `runners/trace.py` | Structured trace emission consumed by `report.py` and the DSPy trace loader. |
 | `runners/config.py` | Shared YAML loader and workspace-path resolver. |
+
+Two sibling packages support the agent layer:
+- `agent/dspy/` — DSPy signatures + modules + metrics for the meta-action picker and the Phase-2 search-round picker (`signatures.py`, `module.py`, `metric_meta.py`, …).
+- `agent/orchestrator/` — meta-loop `actions.py` and `schema.py` (`MetaConfig`, `EnvelopeConfig`).
 
 Both runners:
 - Load `.env` for `OPENAI_API_KEY`.
@@ -60,6 +82,8 @@ These are **artifacts produced by Layer 1 agents** — concrete, hand-runnable T
 |---|---|---|
 | `examples/fixed_boundary/` | First demo: a fixed-boundary GS equilibrium with two cases (`analytic` vs `eqdsk`). Hardcoded physics; useful as a smoke test. | `python run_fixed_boundary_equilibrium.py --case analytic` |
 | `examples/config_driven_equilibrium/` | More sophisticated: **fully config-driven** (no hardcoded `mesh_dx`, order, targets). Adds a discretization sweep runner and a ψ-inverter that tunes parameters to match a target flux map. | `python run_equilibrium_from_config.py discretization_config.yaml` |
+| `examples/dataset_generation/` | Phase-1 workspace. `fast/` holds library-mode sweep output; `ursa/` holds the agent-generated `run_dataset_sweep.py` and its output. | `python -m autotokamak.pipelines phase1 --mode fast` |
+| `examples/surrogate_meta/` | Meta-loop workspace with `fast/` and `ursa/` subdirs, each carrying a `manifest.json`. | `python -m autotokamak.pipelines meta --mode fast` |
 
 ## Prompts dir
 
@@ -74,15 +98,18 @@ These are **artifacts produced by Layer 1 agents** — concrete, hand-runnable T
 |---|---|---|
 | `oft_example_generation.yaml` | `examples/fixed_boundary/` | "Build a fixed-boundary equilibrium example by reading the OFT notebook." |
 | `oft_discretization_example.yaml` | `examples/config_driven_equilibrium/` | "Build a config-driven equilibrium example with a specified API surface." |
-| `dataset_generation.yaml` | `examples/dataset_generation/` | "Build a fixed-boundary GS parameter sweep that writes a surrogate-training dataset." |
+| `dataset_generation.yaml` | `examples/dataset_generation/ursa/` | "Build a fixed-boundary GS parameter sweep that writes a surrogate-training dataset." (Phase-1, ursa mode) |
+| `surrogate_automl.yaml` | `examples/surrogate_automl/ursa/` | "Run a surrogate AutoML search over a generated dataset." (Phase-2, ursa mode) |
+| `surrogate_meta.yaml` | `examples/surrogate_meta/ursa/` | "Drive the self-improving meta-loop over Phase-1 + Phase-2." (meta, ursa mode) |
+| `representation_search.yaml` | (agent workspace) | "Search input/output representations for the surrogate." |
 
 ## How a typical run flows
 
 ```
-agent/prompts/oft_discretization_example.yaml
+src/autotokamak/agent/prompts/oft_discretization_example.yaml
         │
         ▼
-python -m agent.runners.plan_execute --config agent/prompts/oft_discretization_example.yaml
+python -m autotokamak.agent.runners.plan_execute --config src/autotokamak/agent/prompts/oft_discretization_example.yaml
         │
         ▼
 PlanningAgent (LLM) reads problem → emits N steps

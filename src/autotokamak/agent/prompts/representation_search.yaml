@@ -1,0 +1,126 @@
+# Representation-search prompt: URSA explores the DATA-ENGINEERING layer.
+#
+# Design doc docs/active_learning_design.md §D4: DSPy owns tight, typed
+# decisions (meta actions, search rounds); URSA owns this genuinely
+# open-ended, code-shaped task — proposing and evaluating alternative
+# input/output representations for the surrogate, which the platform
+# currently freezes at raw-inputs -> physical-psi -> PCA.
+#
+# Run with the venv activated and .env loaded:
+#   PYTHONPATH=src/autotokamak python -m agent.runners.plan_execute_feedback \
+#       --config src/autotokamak/agent/prompts/representation_search.yaml
+
+problem: |
+  TITLE
+    Find a better DATA REPRESENTATION for the Grad-Shafranov surrogate:
+    engineer input features and/or output transforms that lower psi RMSE
+    at FIXED model class and budget, then report which representation wins
+    and why.
+
+  CONTEXT
+    The current pipeline maps raw geometry inputs (r0, a, kappa, delta, Ip)
+    to PCA coefficients of the physical psi(R,Z) field. That representation
+    was never searched — it is the default. Your job is to search it.
+    The Phase-1 dataset is symlinked into your workspace as `./dataset.h5`
+    (canonical layout: grid/R, grid/Z, inputs/{r0,a,kappa,delta,Ip},
+    outputs/psi (N,nz,nr) with NaN outside the LCFS, outputs/success).
+
+  SEARCH SPACE (pick at least THREE candidates to evaluate, one MUST be
+  the identity/baseline representation so the comparison is anchored)
+    Input-side ideas (non-exhaustive — you may invent your own):
+      - derived shaping features: aspect ratio a/r0, elongation-triangularity
+        interactions kappa*delta, normalized current Ip/(a*B-like scalings),
+        log(Ip), polynomial interactions
+      - input normalization variants (per-feature standardize vs box-scale)
+    Output-side ideas (non-exhaustive):
+      - psi scaling: per-sample psi/Ip normalization WITH Ip retained as an
+        input (the amplitude must remain recoverable — a representation that
+        erases the Ip dependence is invalid)
+      - signed-log or asinh transform of psi before PCA
+      - PCA component count as part of the representation choice
+    OUT OF SCOPE: new model architectures (the zoo is fixed), autoencoders,
+    torch/tensorflow, changing the dataset itself.
+
+  EVALUATION PROTOCOL (fixed — every candidate is scored identically)
+    - load with autotokamak.eval.data.load_dataset; build ONE
+      kfold(bundle, k=4, test_frac=0.15, seed=0) split and reuse it for
+      every candidate (identical folds, identical test set)
+    - model class fixed to kernel_ridge with autotokamak.surrogate.zoo
+      DEFAULT_SEARCH_SPACES ranges and the SAME small Optuna budget per
+      candidate (e.g. 16 trials) — the representation is the variable,
+      not the model
+    - metric: autotokamak.eval.metrics.psi_rmse in ORIGINAL physical psi
+      space — apply the candidate's inverse transform before scoring, so
+      transformed-space wins cannot fake a victory
+    - report per-candidate val RMSE (fold-averaged), test RMSE evaluated
+      ONCE for the winner only, and baseline_mean_predictor_rmse
+
+  DELIVERABLES (exactly four files at the workspace root)
+    1. `representation.py` — a module defining the candidate transforms.
+       Each candidate implements: fit(bundle) -> state,
+       transform_inputs(X) -> X', transform_psi(psi) -> target,
+       inverse_transform_psi(target) -> psi. Pure numpy/sklearn.
+    2. `rep_config.yaml` — candidate list + the fixed protocol knobs
+       (seed, k_folds, test_frac, n_trials_per_candidate).
+    3. `run_representation_search.py` — the runner: takes rep_config.yaml
+       as its sole CLI arg, evaluates every candidate under the protocol,
+       writes outputs/report.json and outputs/leaderboard.csv.
+    4. `README.md` — what was searched, the leaderboard, and a 3-5 sentence
+       analysis of WHY the winner wins (physics-aware if possible).
+    Runner artifacts go under outputs/. The runner must EXIT 0.
+
+    # outputs/report.json (schema — keep it exactly this shape)
+    winner_name: "<candidate name>"
+    candidates: [{name, val_psi_rmse, test_psi_rmse_or_null, n_trials}]
+    baseline_mean_psi_rmse: <float>
+    identity_val_psi_rmse: <float>      # the anchor candidate
+    improvement_vs_identity_pct: <float>
+    seed: 0
+
+  CONSTRAINTS
+    * REUSE the library: load_dataset, kfold, fit_pca/transform/
+      inverse_transform, psi_rmse, make_model, run_study where applicable.
+      Do NOT reimplement PCA, splits, or metrics.
+    * A candidate that changes psi scaling MUST inverse-transform back to
+      physical psi before scoring; report.json numbers are all physical.
+    * Do not run `pip install`; do not call `git`; do not prompt for user
+      input; do not import torch/tensorflow (sklearn-only by design).
+    * No extra files beyond the four deliverables + outputs/: no smoke
+      tests, verifier scripts, requirements.txt, backups, or per-iteration
+      clones of the runner. Iteration state lives in outputs/, not in file
+      copies.
+    * DO NOT touch graph_store.sqlite, ursa_metrics/, or the dataset.h5
+      symlink — URSA infrastructure.
+    * After writing the files, RUN
+      `python run_representation_search.py rep_config.yaml` and verify
+      outputs/report.json exists, parses, and contains >= 3 candidates
+      including the identity anchor.
+
+workspace: examples/representation_search
+model: openai:gpt-5-mini
+
+feedback_rounds: 3
+
+expected_artifacts:
+  - outputs/report.json
+  - outputs/leaderboard.csv
+
+allowed_root_files:
+  - representation.py
+  - rep_config.yaml
+  - run_representation_search.py
+  - README.md
+  - outputs
+infra_root_files:
+  - graph_store.sqlite
+  - ursa_metrics
+  - dataset.h5
+  - __pycache__
+
+symlinks:
+  - source: ./ursa
+    dest: ursa
+  - source: ./OpenFUSIONToolkit
+    dest: OpenFUSIONToolkit
+  - source: examples/dataset_generation/outputs/dataset.h5
+    dest: dataset.h5

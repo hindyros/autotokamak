@@ -28,23 +28,17 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from autotokamak.eval.data import PARAM_ORDER, load_dataset
+from autotokamak.eval.discover import find_training_dataset
 
 
 def _find_dataset(workspace: Path) -> Path | None:
-    """Locate dataset.h5 for a workspace. Meta-loop workspaces symlink it into
-    surrogate_runs/iterN/; direct workspaces put it at the root."""
-    candidates = [
-        workspace / "dataset.h5",
-        workspace / "outputs" / "dataset.h5",
-    ]
-    sur_runs = workspace / "surrogate_runs"
-    if sur_runs.is_dir():
-        for iter_dir in sorted(sur_runs.iterdir()):
-            candidates.append(iter_dir / "dataset.h5")
-    for p in candidates:
-        if p.exists():
-            return p
-    return None
+    """Locate the dataset to visualize for a workspace.
+
+    Handles both direct phase workspaces (``dataset.h5`` / ``outputs/dataset.h5``)
+    and meta-loop workspaces (``datasets/train_pool.h5`` and the grown
+    ``datasets/iterN_dataset.h5`` pools). See ``autotokamak.eval.discover``.
+    """
+    return find_training_dataset(workspace)
 
 
 def _pick_sample_indices(inputs: np.ndarray, n: int) -> np.ndarray:

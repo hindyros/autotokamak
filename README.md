@@ -6,6 +6,12 @@ ML surrogate models and agentic LLM workflows for the **Grad–Shafranov equatio
 
 Built as a summer RA project at **MIT Energy Initiative**.
 
+The platform runs as three phases behind one CLI: **Phase-1** generates a Grad–Shafranov
+parameter-sweep dataset, **Phase-2** runs surrogate AutoML over that dataset, and the
+**meta-loop** chains the two into a self-improving outer loop. Each phase runs in either
+`fast` mode (in-process library code) or `ursa` mode (a URSA agent writes and runs the
+code). See [Running the platform](#running-the-platform) below.
+
 ---
 
 ## Documentation
@@ -57,7 +63,7 @@ The **first example** in this repo is the **OpenFUSIONToolkit TokaMaker fixed-bo
   - **`--case eqdsk`**: the boundary is loaded from OFT’s bundled EQDSK example.
 - For each run it: creates or reads the LCFS boundary, builds a GS domain mesh, configures TokaMaker with targets (e.g. total plasma current) and optional profiles, solves the equilibrium, and writes outputs (NPZ/JSON and optional PNG plots) under `examples/fixed_boundary/outputs/`.
 
-**Quick run (from repo root, with venv active and OFT on `PATH`/`PYTHONPATH`):**
+**Quick run (from repo root, with venv active):**
 
 ```bash
 cd examples/fixed_boundary
@@ -66,15 +72,47 @@ python run_fixed_boundary_equilibrium.py --case analytic
 
 ---
 
-## Agent workflows
+## Running the platform
 
-Agent code lives under `src/autotokamak/agent/`:
+The primary entry point is the unified pipelines CLI:
+
+```bash
+python -m autotokamak.pipelines <phase1|phase2|meta> --mode <fast|ursa> [opts]
+```
+
+| Command | Mode | What it does |
+|---|---|---|
+| `pipelines phase1 --mode fast` | library | `run_sweep` directly → `examples/dataset_generation/fast/` |
+| `pipelines phase1 --mode ursa` | URSA codegen | agent writes `run_dataset_sweep.py` → `examples/dataset_generation/ursa/` |
+| `pipelines phase2 --mode fast` | library | `automl_loop` (Optuna + DSPy) → `examples/surrogate_automl/fast/` |
+| `pipelines phase2 --mode ursa` | URSA codegen | agent writes `run_surrogate_automl.py` → `examples/surrogate_automl/ursa/` |
+| `pipelines meta --mode fast` | library | full self-improving meta-loop → `examples/surrogate_meta/fast/` |
+| `pipelines meta --mode ursa` | hybrid | meta-loop with URSA codegen for nested Phase-2 → `examples/surrogate_meta/ursa/` |
+
+Each run writes `examples/<workspace>/<mode>/manifest.json` (run_id, key paths, score).
+
+Examples:
+
+```bash
+# Phase-1: generate a 500-sample dataset
+python -m autotokamak.pipelines phase1 --mode fast --n-samples 500
+
+# Phase-2: 10-minute AutoML search over the latest dataset
+python -m autotokamak.pipelines phase2 --mode fast --time-budget 600
+
+# Meta-loop: run until the surrogate is 90% better than the mean-predictor baseline
+python -m autotokamak.pipelines meta --mode fast --target-accuracy-pct 90 --max-iterations 5
+```
+
+### Lower-level agent runners
+
+The pipelines CLI dispatches to URSA runners under `src/autotokamak/agent/`. You can also
+invoke these directly:
 
 - **`agent/runners/plan_execute.py`** — plan → execute loop using URSA's PlanningAgent + ExecutionAgent.
 - **`agent/runners/plan_execute_feedback.py`** — same, with a re-planning feedback loop after failures.
+- **`agent/runners/meta_loop.py`** — the autonomous outer loop that drives Phase-1 → Phase-2 and decides each round whether to regenerate the dataset, extend the search, enrich with active learning, or terminate.
 - **`agent/prompts/*.yaml`** — task YAMLs (problem statement, workspace, model, symlinks).
-
-Run from the repo root (with venv active):
 
 ```bash
 python -m autotokamak.agent.runners.plan_execute \
@@ -85,19 +123,40 @@ python -m autotokamak.agent.runners.plan_execute \
 
 ```mermaid
 flowchart TD
-    A[User input<br/>Prompt YAML in src/autotokamak/agent/prompts/*.yaml<br/>problem, workspace, model, symlinks]
-    B[Runner startup<br/>autotokamak.agent.runners.plan_execute*<br/>load .env + parse config + prepare workspace]
-    C[Planning transform<br/>URSA PlanningAgent<br/>natural-language problem -> ordered plan steps]
-    D[Execution transform (loop over steps)<br/>URSA ExecutionAgent<br/>step text + prior summary -> code/files/commands]
-    E[Workspace artifacts<br/>examples/* workspace populated<br/>scripts, YAML configs, README, output dirs]
-    F[Physics solve transform<br/>autotokamak.core + OFT TokaMaker<br/>geometry/profiles/targets -> GS equilibrium solve]
-    G[Numerical outputs<br/>flux + derived quantities<br/>NPZ/JSON (+ optional PNG plots)]
-    H[User rerun path<br/>Run generated scripts directly (no LLM)<br/>reproduce or sweep configurations]
+    CLI[Primary entry point<br/>python -m autotokamak.pipelines phase1 pipe phase2 pipe meta --mode fast pipe ursa]
 
-    A --> B --> C --> D --> E --> F --> G --> H
+    subgraph P1 [Phase-1: dataset generation]
+      SW[data/sweep.py run_sweep<br/>+ optional active learning data/acquire.py, data/envelope.py]
+      DS[dataset.h5<br/>swept params + psi grids]
+    end
 
-    I[Alternate input path<br/>Direct run of committed examples/<br/>CLI flags or simulation YAML]
-    I --> F
+    subgraph P2 [Phase-2: surrogate AutoML]
+      AML[surrogate/automl_loop.py<br/>Optuna over surrogate/zoo.py + DSPy round decisions]
+      WIN[winning surrogate + eval metrics]
+    end
+
+    subgraph META [Meta-loop]
+      ML[agent/runners/meta_loop.py<br/>regen_dataset pipe extend_search pipe enrich_active pipe terminate]
+    end
+
+    CORE[autotokamak.core + OFT TokaMaker<br/>geometry / solver / diagnostics]
+    OUT[examples/&lt;workspace&gt;/&lt;mode&gt;/<br/>manifest.json, artifacts, report]
+
+    CLI --> P1
+    CLI --> P2
+    CLI --> META
+    SW --> CORE
+    SW --> DS
+    DS --> AML
+    AML --> WIN
+    META --> P1
+    META --> P2
+    WIN --> OUT
+    ML --> OUT
+
+    URSA[ursa mode<br/>URSA PlanningAgent + ExecutionAgent<br/>write + run generated scripts]
+    CLI -.->|--mode ursa| URSA
+    URSA --> OUT
 ```
 
 ---

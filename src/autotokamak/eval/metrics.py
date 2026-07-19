@@ -167,6 +167,21 @@ def within_rel_tolerance(
     return float(np.mean(np.abs(t - p) <= float(rel_tol) * scale))
 
 
+def baseline_mean_prediction(psi_train: np.ndarray, n_val: int) -> np.ndarray:
+    """The trivial predictor: per-pixel mean of train ψ, tiled over ``n_val``.
+
+    Shared by ``baseline_mean_predictor_rmse`` (aggregate baseline) and the
+    meta-loop's per-cell baseline so the two never drift apart.
+    """
+    if psi_train.ndim != 3:
+        raise ValueError("psi_train must be shape (N, nz, nr)")
+    # Outside-LCFS pixels are all-NaN columns; silence the resulting warning.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+        mean_psi = np.nanmean(psi_train, axis=0)  # (nz, nr)
+    return np.broadcast_to(mean_psi[None, :, :], (n_val, *mean_psi.shape))
+
+
 def baseline_mean_predictor_rmse(psi_train: np.ndarray, psi_val: np.ndarray) -> float:
     """RMSE of the trivial cell-wise mean predictor.
 
@@ -174,14 +189,9 @@ def baseline_mean_predictor_rmse(psi_train: np.ndarray, psi_val: np.ndarray) -> 
     surrogate beat doing nothing" reference point and is the denominator in
     the scorer's ``val_rmse_vs_baseline`` quality term.
     """
-    if psi_train.ndim != 3 or psi_val.ndim != 3:
+    if psi_val.ndim != 3:
         raise ValueError("psi_train and psi_val must be shape (N, nz, nr)")
-    # Outside-LCFS pixels are all-NaN columns; silence the resulting warning.
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", category=RuntimeWarning)
-        mean_psi = np.nanmean(psi_train, axis=0)  # (nz, nr)
-    # Broadcast mean over the val N axis.
-    pred = np.broadcast_to(mean_psi[None, :, :], psi_val.shape)
+    pred = baseline_mean_prediction(psi_train, psi_val.shape[0])
     return psi_rmse(psi_val, pred)
 
 
@@ -245,6 +255,98 @@ def summarize_psi_errors(
     return out
 
 
+def per_cell_errors(
+    inputs: np.ndarray,
+    true: np.ndarray,
+    pred: np.ndarray,
+    *,
+    bounds_low: np.ndarray,
+    bounds_high: np.ndarray,
+    n_bins: int = 2,
+    param_names: tuple[str, ...] = ("r0", "a", "kappa", "delta", "Ip"),
+) -> dict[str, Any]:
+    """Stratified per-geometry-cell error breakdown for an eval batch.
+
+    Bins each sample into a joint geometry cell (``n_bins`` equal-width bins
+    per input dimension over ``[bounds_low, bounds_high]``, samples outside
+    the box clipped into the edge bins) and computes ``psi_rmse`` per
+    occupied cell, plus per-parameter tercile marginals. This is the metric
+    that shows WHERE the surrogate is weak — aggregate RMSE alone cannot
+    distinguish "uniformly mediocre" from "great in the seed box, broken at
+    high kappa", which is exactly the distinction active sampling must close.
+
+    Returns a JSON-serializable dict:
+      n_cells_total / n_cells_occupied  — joint-cell coverage
+      cells            — {cell_key: {"n", "rmse"}}; key = "-".join(bin indices)
+      worst_cell       — {"key", "rmse", "n"} (max-RMSE occupied cell)
+      mean_cell_rmse   — unweighted mean over occupied cells (each geometry
+                         region counts equally, however many samples landed in it)
+      overall_rmse     — plain aggregate psi_rmse for reference
+      marginals        — {param: [{"bin", "low", "high", "n", "rmse"}, ...]}
+                         with 3 equal-width bins per parameter
+    """
+    inputs = np.asarray(inputs, dtype=np.float64)
+    lows = np.asarray(bounds_low, dtype=np.float64)
+    highs = np.asarray(bounds_high, dtype=np.float64)
+    if inputs.ndim != 2 or inputs.shape[1] != lows.size:
+        raise ValueError(f"inputs must be (N, {lows.size}); got {inputs.shape}")
+    n, d = inputs.shape
+    span = np.maximum(highs - lows, 1e-12)
+
+    def _bin(n_b: int) -> np.ndarray:
+        u = (inputs - lows[None, :]) / span[None, :]
+        return np.clip((u * n_b).astype(int), 0, n_b - 1)  # (N, d)
+
+    joint = _bin(int(n_bins))
+    cells: dict[str, dict[str, Any]] = {}
+    for key in np.unique(joint, axis=0):
+        in_cell = np.all(joint == key[None, :], axis=1)
+        cells["-".join(str(int(b)) for b in key)] = {
+            "n": int(in_cell.sum()),
+            "rmse": psi_rmse(true[in_cell], pred[in_cell]),
+        }
+
+    occupied = {k: v for k, v in cells.items() if np.isfinite(v["rmse"])}
+    worst = (
+        max(occupied.items(), key=lambda kv: kv[1]["rmse"]) if occupied else None
+    )
+
+    tercile = _bin(3)
+    marginals: dict[str, list[dict[str, Any]]] = {}
+    for j, name in enumerate(param_names[:d]):
+        rows = []
+        for b in range(3):
+            in_bin = tercile[:, j] == b
+            rows.append(
+                {
+                    "bin": b,
+                    "low": float(lows[j] + b * span[j] / 3),
+                    "high": float(lows[j] + (b + 1) * span[j] / 3),
+                    "n": int(in_bin.sum()),
+                    "rmse": psi_rmse(true[in_bin], pred[in_bin]) if in_bin.any() else float("nan"),
+                }
+            )
+        marginals[name] = rows
+
+    return {
+        "n_samples": int(n),
+        "n_bins": int(n_bins),
+        "n_cells_total": int(n_bins**d),
+        "n_cells_occupied": len(occupied),
+        "cells": cells,
+        "worst_cell": (
+            {"key": worst[0], "rmse": worst[1]["rmse"], "n": worst[1]["n"]}
+            if worst
+            else None
+        ),
+        "mean_cell_rmse": (
+            float(np.mean([v["rmse"] for v in occupied.values()])) if occupied else float("nan")
+        ),
+        "overall_rmse": psi_rmse(true, pred),
+        "marginals": marginals,
+    }
+
+
 def format_metric_report(summary: dict[str, Any], *, title: str = "ψ metrics") -> str:
     """Human-readable multi-line report for notebook / CLI printing."""
     lines = [f"=== {title} ==="]
@@ -274,9 +376,11 @@ def format_metric_report(summary: dict[str, Any], *, title: str = "ψ metrics") 
 
 
 __all__ = [
+    "baseline_mean_prediction",
     "baseline_mean_predictor_rmse",
     "format_metric_report",
     "pearson_r",
+    "per_cell_errors",
     "pixelwise_max_err",
     "psi_mae",
     "psi_rmse",

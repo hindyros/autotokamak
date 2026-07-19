@@ -22,7 +22,15 @@ from typing import Optional
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
+# Default report cutoff: runs started before this are excluded from the
+# index. Currently set to the start of the 20260718T231755Z run (the
+# max_iterations=20 meta run) — earlier same-day shakeout runs and everything
+# pre-active-sampling are hidden. Pass --since all to include everything, or
+# --since YYYY-MM-DD[THH:MM] for a different cutoff.
+DEFAULT_SINCE = "2026-07-18T23:17"
+
 LOG_TS_RE = re.compile(r"_(\d{8}T\d{6}Z)\.log$")
+RUN_ID_TS_RE = re.compile(r"^(\d{8}T\d{6}Z)")
 
 
 @dataclass
@@ -178,6 +186,13 @@ tr:hover { background: rgba(3, 102, 214, 0.05); }
 .score-low  { background: #ffd1d1; color: #7a1a1a; }
 .score-fail { background: #4a1a1a; color: #ffd1d1; }
 .score-none { background: #eee; color: #666; }
+.phase { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; text-transform: capitalize; }
+.phase-meta { background: #e6dcff; color: #4b2c91; }
+.phase-dataset { background: #d7ecff; color: #0a4a7a; }
+.phase-surrogate { background: #ffe6cc; color: #8a4b00; }
+.phase-unknown { background: #eee; color: #666; }
+.pos { color: #1a5d1a; font-weight: 600; }
+.neg { color: #a10000; font-weight: 600; }
 .status-completed { color: #1a5d1a; }
 .status-errored, .status-failed { color: #a10000; }
 .status-interrupted { color: #7a5c00; }
@@ -256,21 +271,20 @@ COLUMN_TIPS = {
     "Model": "LLM string passed to langchain init_chat_model, used for both the PlanningAgent and the ExecutionAgent.",
     "Rounds": "Number of plan → execute → re-plan feedback rounds actually completed.",
     "Status": "Final trace status: completed = clean exit, errored = uncaught exception, interrupted = SIGINT/timeout.",
-    "Dataset score": (
-        "Composite ∈ [0, 1] from metric.score_run — Phase-1 dataset-generation scorer.\n\n"
-        "Question: Did the agent produce a valid physics dataset?\n\n"
-        "Hard gates (all must pass): deliverables_present, dataset_h5_opens, at_least_one_success.\n\n"
-        "Quality terms (weighted sum): success_rate, inside_lcfs_quality, outside_lcfs_honesty, "
-        "shape_fidelity, runner_cleanliness.\n\n"
-        "Buckets: ≥ 0.75 good · ≥ 0.50 mid · < 0.50 low · GATE FAIL = a hard gate missed · — = not this scorer's phase."
+    "Started": "UTC start time of the run (trace started_utc).",
+    "Duration": "Total wall time from trace start to finish. '—' = the trace was never closed (still running, or the process died).",
+    "Phase": (
+        "Which stage this run is: dataset = Phase-1 sweep generation · surrogate = Phase-2 AutoML · "
+        "meta = the self-improving Phase-1→Phase-2 loop · unknown = could not classify."
     ),
-    "Surrogate score": (
-        "Composite ∈ [0, 1] from metric_surrogate.score_surrogate_run — Phase-2 AutoML scorer.\n\n"
-        "Question: Did the agent produce a trained surrogate that actually predicts ψ(R,Z)?\n\n"
-        "Hard gates (all must pass): deliverables_present, winner_loads, report_parseable, winner_predicts.\n\n"
-        "Quality terms (weighted sum): val_rmse_vs_baseline, pca_efficiency, generalization_gap, "
-        "search_efficiency, zoo_coverage, agent_decisiveness, runner_cleanliness.\n\n"
-        "Buckets: ≥ 0.75 good · ≥ 0.50 mid · < 0.50 low · GATE FAIL = a hard gate missed · — = not this scorer's phase."
+    "Result": (
+        "Headline outcome, read per phase:\n\n"
+        "meta: % error reduction vs the mean-predictor baseline on the frozen eval shard, "
+        "iteration count, and the chain of actions taken (regen_dataset / extend_search / "
+        "enrich_active / terminate).\n\n"
+        "dataset / surrogate: the scorer's composite ∈ [0, 1] — ≥ 0.75 good · ≥ 0.50 mid · "
+        "< 0.50 low · GATE FAIL = a hard gate missed.\n\n"
+        "Open the run page for the full per-iteration table and decision timeline."
     ),
     "Workspace": "The workspace/ dir under examples/ where the agent wrote its deliverables.",
     "Parent": "For Phase-3 meta-runs: the outer meta-loop run ID that spawned this Phase-2 child. Blank for standalone runs.",
@@ -293,27 +307,69 @@ def _phase_of(score: dict, prompt_path: str) -> str:
     return "unknown"
 
 
-def _write_index(runs: list[dict], out_dir: Path) -> None:
+def _write_index(
+    runs: list[dict], out_dir: Path, since: Optional[_dt.datetime] = None
+) -> None:
     rows = []
     for r in runs:
-        score = r["trace"].get("score") or {}
+        trace = r["trace"]
+        prompt = trace.get("prompt", {}) or {}
+        score = trace.get("score") or {}
         cls, label = _fmt_score(score)
-        phase = _phase_of(score, str(r["trace"].get("prompt", {}).get("path", "")))
-        n_rounds = len(r["trace"].get("rounds") or [])
-        status = r["trace"].get("status") or "unknown"
-        parent = r["trace"].get("parent_run_id")
+        workspace_str = str(prompt.get("workspace", ""))
+        workspace_path = Path(workspace_str) if workspace_str else None
+        meta = _meta_index_summary(workspace_path)
+        phase = "meta" if meta else _phase_of(score, str(prompt.get("path", "")))
+        n_rounds = len(trace.get("rounds") or [])
+        status = trace.get("status") or "unknown"
+        parent = trace.get("parent_run_id")
         parent_html = f'<a href="{html.escape(parent)}.html">{html.escape(parent)}</a>' if parent else ""
-        dataset_cell = f'<span class="badge {cls}">{label}</span>' if phase == "dataset" else '<span class="muted">—</span>'
-        surrogate_cell = f'<span class="badge {cls}">{label}</span>' if phase == "surrogate" else '<span class="muted">—</span>'
+        phase_cell = f'<span class="phase phase-{phase}">{html.escape(phase)}</span>'
+        started = _parse_utc(trace.get("started_utc") or "")
+        started_cell = started.strftime("%Y-%m-%d %H:%M") if started else "—"
+        duration_cell = _fmt_duration(
+            trace.get("started_utc") or "", trace.get("finished_utc") or ""
+        ) or "—"
+
+        # One "Result" column that reads correctly for every run type:
+        #   meta      → accuracy vs baseline + iteration count + action chain
+        #   dataset/surrogate → the scorer's badge
+        if meta:
+            acc = meta["acc"]
+            acc_html = (
+                f'{_fmt_meta_pct(acc)} <span class="muted">vs baseline</span>'
+                if acc is not None else '<span class="muted">no winner</span>'
+            )
+            # Compress consecutive repeats: [a, b, b, b] → "a → b ×3".
+            groups: list[tuple[str, int]] = []
+            for a in meta["actions"]:
+                if groups and groups[-1][0] == a:
+                    groups[-1] = (a, groups[-1][1] + 1)
+                else:
+                    groups.append((a, 1))
+            actions = " → ".join(
+                html.escape(a) + (f" ×{n}" if n > 1 else "") for a, n in groups
+            ) or "—"
+            result_cell = (
+                f'<div>{acc_html} · {html.escape(str(meta["iters"]))} iters</div>'
+                f'<div class="mono muted" style="font-size:11px">{actions}</div>'
+            )
+        elif phase in ("dataset", "surrogate"):
+            result_cell = f'<span class="badge {cls}">{label}</span>'
+        else:
+            result_cell = '<span class="muted">—</span>'
+
         rows.append(
             f'<tr>'
             f'<td><a href="{html.escape(r["run_id"])}.html">{html.escape(r["run_id"])}</a></td>'
-            f'<td class="mono">{html.escape(str(r["trace"].get("prompt", {}).get("model", "")))}</td>'
+            f'<td>{phase_cell}</td>'
+            f'<td class="mono">{html.escape(str(prompt.get("model", "")))}</td>'
             f'<td>{n_rounds}</td>'
             f'<td class="status-{html.escape(status)}">{html.escape(status)}</td>'
-            f'<td>{dataset_cell}</td>'
-            f'<td>{surrogate_cell}</td>'
-            f'<td class="mono muted">{html.escape(Path(str(r["trace"].get("prompt", {}).get("workspace", ""))).name)}</td>'
+            f'<td class="mono muted">{started_cell}</td>'
+            f'<td class="mono">{duration_cell}</td>'
+            f'<td>{result_cell}</td>'
+            f'<td class="mono muted">{html.escape(Path(workspace_str).name)}</td>'
             f'<td>{parent_html}</td>'
             f'</tr>'
         )
@@ -323,12 +379,25 @@ def _write_index(runs: list[dict], out_dir: Path) -> None:
             return f'<th data-tip="{html.escape(tip)}">{html.escape(name)}</th>'
         return f'<th>{html.escape(name)}</th>'
 
-    columns = ["Run ID", "Model", "Rounds", "Status", "Dataset score", "Surrogate score", "Workspace", "Parent"]
+    columns = ["Run ID", "Phase", "Model", "Rounds", "Status", "Started", "Duration", "Result", "Workspace", "Parent"]
     header = "".join(_th(c) for c in columns)
+    if since is not None:
+        cutoff_str = (
+            str(since.date())
+            if (since.hour, since.minute, since.second) == (0, 0, 0)
+            else since.strftime("%Y-%m-%d %H:%M UTC")
+        )
+        since_note = (
+            f' Showing runs since <span class="mono">{cutoff_str}</span>; '
+            f'regenerate with <span class="mono">--since all</span> '
+            f'for the full history.'
+        )
+    else:
+        since_note = ""
     body = (
         f'<h1>autotokamak — agent runs</h1>'
         f'<p class="muted">Hover any column header for its definition. Regenerate: '
-        f'<span class="mono">python tools/trace_to_html.py</span></p>'
+        f'<span class="mono">python tools/trace_to_html.py</span>.{since_note}</p>'
         f'<table>'
         f'<thead><tr>{header}</tr></thead>'
         f'<tbody>{"".join(rows)}</tbody>'
@@ -580,6 +649,134 @@ def _render_meta_iterations(workspace: Path | None) -> str:
     )
 
 
+def _meta_pct(new, old) -> Optional[float]:
+    """Error-reduction %: positive means ``new`` is better (lower). None if not computable."""
+    try:
+        new_f = float(new)
+        old_f = float(old)
+    except (TypeError, ValueError):
+        return None
+    if not (old_f > 0) or new_f != new_f or old_f != old_f:  # reject NaN / non-positive base
+        return None
+    return 100.0 * (old_f - new_f) / old_f
+
+
+def _fmt_meta_pct(p: Optional[float]) -> str:
+    if p is None:
+        return '<span class="muted">—</span>'
+    cls = "pos" if p >= 0 else "neg"
+    return f'<span class="{cls}">{p:+.1f}%</span>'
+
+
+def _meta_outcome(result) -> str:
+    """One-line human summary of a meta action's result dict (mirrors the terminal)."""
+    if not isinstance(result, dict) or not result:
+        return "—"
+    if result.get("error"):
+        return f"ERROR: {result['error']}"
+    kind = result.get("kind", "")
+    if kind in ("regen_dataset", "enrich_active"):
+        noun = "targeted samples" if kind == "enrich_active" else "samples"
+        return (
+            f"+{result.get('n_new_succeeded', '?')}/{result.get('n_new_requested', '?')} "
+            f"{noun} → pool {result.get('n_total_succeeded', '?')}"
+        )
+    if kind == "extend_search":
+        parts = []
+        if result.get("n_rounds") is not None:
+            parts.append(f"{result['n_rounds']} rounds")
+        if result.get("elapsed_seconds") is not None:
+            try:
+                parts.append(f"{float(result['elapsed_seconds']):.0f}s")
+            except (TypeError, ValueError):
+                pass
+        if result.get("shard_rmse") is not None:
+            parts.append(f"shard RMSE {_fmt_number(result['shard_rmse'])}")
+        models = result.get("models_emphasized") or []
+        if models:
+            parts.append("models: " + ",".join(map(str, models)))
+        return "search: " + ", ".join(parts) if parts else "search"
+    if kind == "terminate":
+        return f"terminate: {result.get('reason') or '(no reason given)'}"
+    return kind or "—"
+
+
+def _meta_records(workspace: Path) -> tuple[list, dict]:
+    """Return (iterations, report) from meta_trace.json; fall back to report.json."""
+    mt = _load_json(workspace / "meta_trace.json")
+    if isinstance(mt, dict) and mt.get("iterations"):
+        report = mt.get("report") or _load_json(workspace / "report.json") or {}
+        return list(mt.get("iterations") or []), report
+    return [], (_load_json(workspace / "report.json") or {})
+
+
+def _meta_index_summary(workspace: Path | None) -> Optional[dict]:
+    """Headline meta metrics for an index row, or None if this isn't a meta run."""
+    if workspace is None:
+        return None
+    iterations, report = _meta_records(workspace)
+    is_meta = bool(iterations) or bool(report.get("actions_taken")) or ("n_iterations" in report)
+    if not is_meta:
+        return None
+    acc = report.get("final_accuracy_pct")
+    if acc is None:
+        acc = _meta_pct(report.get("final_rmse"), report.get("baseline_rmse"))
+    actions = report.get("actions_taken") or [
+        (rec.get("decision") or {}).get("action")
+        for rec in iterations
+        if isinstance(rec, dict)
+    ]
+    return {
+        "iters": report.get("n_iterations", len(iterations)),
+        "acc": acc,
+        "actions": [a for a in actions if a],
+        "terminated_by": report.get("terminated_by"),
+    }
+
+
+def _render_meta_iteration_table(workspace: Path | None) -> str:
+    """Compact per-iteration table: action, outcome, RMSE, Δ vs prev, vs baseline.
+
+    Mirrors the terminal ``=== META SUMMARY ===`` table so the HTML report and
+    the live terminal tell the same story. Silent no-op if not a meta run.
+    """
+    if workspace is None:
+        return ""
+    iterations, report = _meta_records(workspace)
+    if not iterations:
+        return ""
+    baseline = report.get("baseline_rmse")
+    rows: list[str] = []
+    prev_rmse = None
+    for rec in iterations:
+        if not isinstance(rec, dict):
+            continue
+        it = rec.get("iteration", "?")
+        action = (rec.get("decision") or {}).get("action", "—")
+        outcome = _meta_outcome(rec.get("result"))
+        rmse = rec.get("rmse_after")
+        rmse_txt = _fmt_number(rmse) if rmse is not None else '<span class="muted">—</span>'
+        rows.append(
+            f'<tr><td>{html.escape(str(it))}</td>'
+            f'<td class="mono">{html.escape(str(action))}</td>'
+            f'<td>{html.escape(outcome)}</td>'
+            f'<td class="mono">{rmse_txt}</td>'
+            f'<td>{_fmt_meta_pct(_meta_pct(rmse, prev_rmse))}</td>'
+            f'<td>{_fmt_meta_pct(_meta_pct(rmse, baseline))}</td></tr>'
+        )
+        if rmse is not None:
+            prev_rmse = rmse
+    return (
+        '<h2>Per-iteration summary</h2>'
+        '<p class="muted">Δ vs prev / vs baseline = % error reduction on the frozen eval '
+        'shard (positive = improvement). Same numbers as the terminal META SUMMARY table.</p>'
+        '<table><thead><tr>'
+        '<th>Iter</th><th>Action</th><th>Outcome</th><th>RMSE</th>'
+        '<th>Δ vs prev</th><th>vs baseline</th>'
+        '</tr></thead><tbody>' + "".join(rows) + '</tbody></table>'
+    )
+
+
 def _render_meta_report(workspace: Path | None) -> str:
     """Render the MetaReport (final RMSE, winner model, actions taken, RMSE history)."""
     if workspace is None:
@@ -748,6 +945,50 @@ def _render_physics_plots(workspace: Path | None, out_dir: Path) -> str:
         f'<h2>Physics visualizations</h2>'
         f'<p class="muted">Sample equilibria from the dataset — the ψ(R,Z) fields the surrogate is trying to predict. '
         f'Regenerate: <span class="mono">python tools/render_physics.py --workspace {html.escape(str(workspace))}</span></p>'
+        f'<div class="physics-grid">{figs}</div>'
+    )
+
+
+META_PLOTS = [
+    ("convergence.png",   "Meta-loop convergence — frozen-shard RMSE vs iteration, by action"),
+    ("per_cell_rmse.png", "Per-geometry-cell error — where the surrogate is weakest"),
+]
+
+
+def _render_meta_plots(workspace: Path | None, out_dir: Path) -> str:
+    """Embed meta-loop plots (convergence curve + per-cell error).
+    Generated by tools/render_meta_plots.py; silent no-op if not a meta run."""
+    if workspace is None:
+        return ""
+    src = workspace / "outputs" / "meta_plots"
+    if not src.is_dir():
+        return ""
+    ns = workspace.name
+    dst = out_dir / "meta" / ns
+    dst.mkdir(parents=True, exist_ok=True)
+    import shutil
+    embedded: list[tuple[str, str]] = []
+    for fname, title in META_PLOTS:
+        s = src / fname
+        if s.is_file():
+            try:
+                shutil.copy(s, dst / fname)
+                embedded.append((fname, title))
+            except Exception:  # noqa: BLE001
+                pass
+    if not embedded:
+        return ""
+    figs = "".join(
+        f'<figure class="physics-fig">'
+        f'<a href="meta/{html.escape(ns)}/{html.escape(fname)}"><img src="meta/{html.escape(ns)}/{html.escape(fname)}" alt="{html.escape(title)}"></a>'
+        f'<figcaption>{html.escape(title)}</figcaption>'
+        f'</figure>'
+        for fname, title in embedded
+    )
+    return (
+        f'<h2>Meta-loop plots</h2>'
+        f'<p class="muted">How the loop improved the surrogate over its iterations. '
+        f'Regenerate: <span class="mono">python tools/render_meta_plots.py --workspace {html.escape(str(workspace))}</span></p>'
         f'<div class="physics-grid">{figs}</div>'
     )
 
@@ -961,6 +1202,16 @@ def _ensure_plots(workspace: Path | None) -> None:
                  "--workspace", str(workspace)],
                 cwd=REPO_ROOT,
             )
+    # Meta-loop plots (convergence curve + per-cell error) — only meaningful when
+    # the workspace has a meta trace; the generator no-ops otherwise.
+    if (workspace / "meta_trace.json").exists() or (workspace / "report.json").exists():
+        meta_marker = workspace / "outputs" / "meta_plots" / "convergence.png"
+        if not meta_marker.exists():
+            _try_run(
+                [sys.executable, str(REPO_ROOT / "tools" / "render_meta_plots.py"),
+                 "--workspace", str(workspace)],
+                cwd=REPO_ROOT,
+            )
 
 
 def _render_step_body(step: dict, raw: str | None) -> str:
@@ -1063,6 +1314,8 @@ def _write_detail(run: dict, out_dir: Path, all_runs: list[dict] | None = None) 
     workspace_path = Path(prompt.get("workspace")) if prompt.get("workspace") else None
     _ensure_plots(workspace_path)
     meta_report_html = _render_meta_report(workspace_path)
+    meta_table_html = _render_meta_iteration_table(workspace_path)
+    meta_plots_html = _render_meta_plots(workspace_path, out_dir)
     meta_iters_html = _render_meta_iterations(workspace_path)
     surrogate_html = _render_surrogate_leaderboard(workspace_path)
     physics_html = _render_physics_plots(workspace_path, out_dir)
@@ -1109,6 +1362,8 @@ def _write_detail(run: dict, out_dir: Path, all_runs: list[dict] | None = None) 
         + score_html
         # ── Results ──
         + meta_report_html
+        + meta_table_html
+        + meta_plots_html
         + surrogate_html
         + eval_html
         # ── Narrative ──
@@ -1130,19 +1385,69 @@ def _write_detail(run: dict, out_dir: Path, all_runs: list[dict] | None = None) 
     )
 
 
+def _run_started(trace: dict, run_id: str) -> Optional[_dt.datetime]:
+    """Run start time from the trace, falling back to the run-id timestamp."""
+    started = _parse_utc(trace.get("started_utc", ""))
+    if started is not None:
+        return started
+    m = RUN_ID_TS_RE.match(run_id)
+    if m:
+        try:
+            return _dt.datetime.strptime(m.group(1), "%Y%m%dT%H%M%SZ").replace(
+                tzinfo=_dt.timezone.utc
+            )
+        except ValueError:
+            pass
+    return None
+
+
+def _parse_since(value: str) -> Optional[_dt.datetime]:
+    """'all' → no cutoff; else an ISO date/datetime (assumed UTC if naive)."""
+    if not value or value.lower() == "all":
+        return None
+    cutoff = _parse_utc(value if "T" in value else value + "T00:00:00")
+    if cutoff is None:
+        raise SystemExit(f"--since: cannot parse {value!r} (use YYYY-MM-DD or 'all')")
+    if cutoff.tzinfo is None:
+        cutoff = cutoff.replace(tzinfo=_dt.timezone.utc)
+    return cutoff
+
+
+def _prune_stale_pages(out_dir: Path, kept_run_ids: set[str]) -> int:
+    """Delete detail pages for runs no longer in the index (e.g. pre-cutoff)."""
+    n = 0
+    for f in out_dir.glob("*.html"):
+        if f.name == "index.html":
+            continue
+        m = RUN_ID_TS_RE.match(f.stem)
+        if m and m.group(1) not in kept_run_ids:
+            f.unlink()
+            n += 1
+    return n
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--experiments", default=str(REPO_ROOT / "experiments"))
     p.add_argument("--logs", default=str(REPO_ROOT / "logs"))
     p.add_argument("--out", default=None, help="Output dir (default: <experiments>/_report)")
+    p.add_argument(
+        "--since",
+        default=DEFAULT_SINCE,
+        help="Only include runs started on/after this ISO date (default: "
+             f"{DEFAULT_SINCE}, the active-sampling implementation date). "
+             "Pass 'all' to include every run.",
+    )
     args = p.parse_args()
 
     exp_dir = Path(args.experiments)
     logs = _index_logs(Path(args.logs))
     out_dir = Path(args.out) if args.out else (exp_dir / "_report")
     out_dir.mkdir(parents=True, exist_ok=True)
+    since = _parse_since(args.since)
 
     runs = []
+    n_excluded = 0
     for trace_path in sorted(exp_dir.glob("*/trace.json")):
         try:
             trace = json.loads(trace_path.read_text())
@@ -1150,7 +1455,10 @@ def main() -> None:
             print(f"skip {trace_path}: {type(exc).__name__}: {exc}")
             continue
         run_id = trace_path.parent.name
-        started = _parse_utc(trace.get("started_utc", ""))
+        started = _run_started(trace, run_id)
+        if since is not None and (started is None or started < since):
+            n_excluded += 1
+            continue
         log = _match_log(started, logs)
         runs.append({"run_id": run_id, "trace": trace, "log_path": log.path if log else None})
 
@@ -1158,8 +1466,12 @@ def main() -> None:
 
     for run in runs:
         _write_detail(run, out_dir, all_runs=runs)
-    _write_index(runs, out_dir)
+    _write_index(runs, out_dir, since=since)
+    n_pruned = _prune_stale_pages(out_dir, {r["run_id"] for r in runs})
 
+    if since is not None:
+        print(f"cutoff --since {since.date()}: excluded {n_excluded} older runs, "
+              f"pruned {n_pruned} stale pages")
     print(f"wrote {len(runs)} run pages to {out_dir}")
     print(f"open: {out_dir / 'index.html'}")
 

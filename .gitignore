@@ -48,14 +48,22 @@ ursa_metrics/
 # Agent-run logs
 logs/
 
-# ML data and model artifacts (generated; track structure via .gitkeep only)
-data/raw/*
-!data/raw/.gitkeep
-data/processed/*
-!data/processed/.gitkeep
-models/checkpoints/*
-!models/checkpoints/.gitkeep
+# Per-run experiment artifacts (generated; track structure via .gitkeep only)
 experiments/*
 !experiments/.gitkeep
+
+# Heavy run artifacts inside example workspaces (stay on disk, never commit)
+examples/**/*.h5
+examples/**/*.pkl
+examples/surrogate_meta/datasets/
+examples/surrogate_meta/iterations/
+examples/surrogate_meta/refits/
+examples/surrogate_meta/surrogate_runs/
+examples/surrogate_meta/meta_trace.json
+examples/surrogate_meta/report.json
+
+# Notebook run outputs
+notebooks/manual_surrogate_run/
+notebooks/scaling_runs/
 .claude/scheduled_tasks.lock
 .claude/settings.local.json

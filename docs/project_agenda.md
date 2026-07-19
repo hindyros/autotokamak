@@ -1,10 +1,18 @@
 # Project Agenda — `autotokamak`
 
-Status: living document. Last updated 2026-06-15.
+Status: living document. Last updated 2026-06-15 (agenda text); see the shipped-status note below.
 
 This file records what we're trying to build, why, and which decisions are still pending. Read this before adding new prompts, agents, or surrogate-model code — it pins down scope so the repo doesn't drift.
 
 For repo structure, setup, and code conventions, see [`CLAUDE.md`](../CLAUDE.md). This file is the *intent*; CLAUDE.md is the *mechanics*.
+
+> **What has shipped since this agenda was written (2026-07):** several items below are
+> now implemented and no longer open questions.
+> - **Unified pipelines CLI** — `python -m autotokamak.pipelines <phase1|phase2|meta> --mode <fast|ursa>` is the primary entry point; the "planned prompt pipeline" ASCII flow further down is superseded by it (and the prompts `dataset_explore.yaml` / `surrogate_baseline.yaml` / `benchmark_report.yaml` in that flow were never created).
+> - **Phase-2** is implemented as structured AutoML in `src/autotokamak/surrogate/` (`automl_loop.py`, `automl.py`, `zoo.py`, `schema.py`) — the "A/B/C variant" question is resolved in code.
+> - **Meta-loop** — `agent/runners/meta_loop.py` (+ `pipelines meta`) is the autonomous Phase-1 → Phase-2 outer loop.
+> - **Active learning** — `data/acquire.py` + `data/envelope.py` provide residual-driven acquisition and envelope evaluation (the meta-loop's `enrich_active` action).
+> - Week-2/Week-4 milestones (sweeps/HDF5, surrogates) below are done; treat the weekly plan as historical.
 
 ---
 

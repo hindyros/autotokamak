@@ -546,6 +546,63 @@ def test_target_rmse_stops_loop_early(tmp_path: Path, monkeypatch):
     not REAL_DATASET.is_file(),
     reason=f"Phase-1 dataset not present at {REAL_DATASET}",
 )
+def test_target_accuracy_pct_stops_loop_early(tmp_path: Path, monkeypatch):
+    """The performance stop (target_accuracy_pct) stops the loop and records
+    the achieved accuracy in the report."""
+    sys.path.insert(0, str(REPO_ROOT / "src" / "autotokamak"))
+    try:
+        from autotokamak.agent.runners.meta_loop import run
+    finally:
+        sys.path.pop(0)
+
+    cfg_path = tmp_path / "meta_config.yaml"
+    cfg_path.write_text(
+        "max_iterations: 3\n"
+        "seed: 0\n"
+        "target_accuracy_pct: 10\n"   # stub winner clears 10% error reduction
+        f"initial_dataset_h5: {REAL_DATASET}\n"
+        f"phase2_prompt: {PHASE2_PROMPT}\n"
+        f"workspace: {tmp_path / 'meta_ws'}\n"
+        "model: openai:gpt-5.2\n"
+    )
+
+    def fake_run_automl_loop(**kwargs):
+        sub_ws = Path(kwargs["workdir"])
+        _stub_winner_workspace(sub_ws, Path(kwargs["test_shard_h5"]))
+        return {"winner": {"winner_model_name": "poly_ridge"}, "terminated_by": "agent",
+                "n_rounds": 1, "val_psi_rmse": 0.5}
+
+    import autotokamak.surrogate.automl_loop as loop_mod
+    import autotokamak.agent.dspy.module as dspy_mod
+
+    monkeypatch.setattr(loop_mod, "run_automl_loop", fake_run_automl_loop)
+    monkeypatch.setattr(dspy_mod, "make_search_decision_fn", lambda model: (lambda ctx: None))
+
+    picker = _make_picker(
+        [
+            {
+                "action": "extend_search",
+                "extend": {"rationale": f"round {i}"},
+                "diagnosis": "keep searching",
+            }
+            for i in range(3)
+        ]
+    )
+    report = run(config_path=str(cfg_path), pick_action=picker, trace_enabled=False)
+
+    assert report.terminated_by == "target_reached"
+    assert report.n_iterations == 1  # stopped after the first qualifying iteration
+    extras = report.model_dump()
+    assert extras["target_accuracy_pct"] == 10.0
+    # Achieved accuracy is reported and clears the requested bar.
+    assert extras["final_accuracy_pct"] is not None
+    assert extras["final_accuracy_pct"] >= 10.0
+
+
+@pytest.mark.skipif(
+    not REAL_DATASET.is_file(),
+    reason=f"Phase-1 dataset not present at {REAL_DATASET}",
+)
 def test_extend_search_codegen_dispatch(tmp_path: Path, monkeypatch):
     """phase2_mode=codegen still routes through plan_execute_feedback."""
     sys.path.insert(0, str(REPO_ROOT / "src" / "autotokamak"))

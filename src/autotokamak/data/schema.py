@@ -20,7 +20,7 @@ PARAM_ORDER = ("r0", "a", "kappa", "delta", "Ip")
 
 class SamplingConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    method: Literal["lhs", "uniform"] = "lhs"
+    method: Literal["lhs", "uniform", "sobol"] = "lhs"
     n_samples: int = Field(ge=1, le=10_000)
     seed: int = 0
 

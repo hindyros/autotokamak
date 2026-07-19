@@ -1,6 +1,11 @@
 # Surrogate AutoML — the full search space
 
-Status: living document. Last updated 2026-06-23.
+Status: living document. Last updated 2026-07-18.
+
+> **Note (2026-07):** the "N=16" framing throughout this doc reflects the earliest PoC
+> dataset. Phase-1 now routinely runs N ≥ 200–500 (`sampling.n_samples`), and Phase-3
+> active learning (`data/acquire.py`, `data/envelope.py`) grows the pool further. Read the
+> small-N caveats below as historical motivation, not current data scale.
 
 This doc maps every knob that can affect the quality of the ML surrogate we
 train to approximate the Grad–Shafranov solver. The point is to make the
@@ -114,7 +119,7 @@ move. They are not interchangeable knobs.
 
 | Knob | Today | Tunable? | Lives where |
 |---|---|---|---|
-| **Geometry sampling distribution** | Latin Hypercube | Yes via `dataset_generation.yaml` | `sampling.method` |
+| **Geometry sampling distribution** | Latin Hypercube | Yes via `dataset_generation.yaml` | `sampling.method` ∈ {`lhs`, `uniform`, `sobol`} |
 | Geometry bounds (r0, a, κ, δ, Ip) | r0∈[.35,.55], a∈[.10,.20], κ∈[1.0,1.6], δ∈[0,.4], Ip∈[80k,200k] | Yes | `parameters` block |
 | N samples | 16 | Yes (cheaply up to ~256; slow above) | `sampling.n_samples` |
 | RNG seed | 0 | Yes | `sampling.seed` |
@@ -329,15 +334,17 @@ either fixed by us or fixed by the library.
 
 Two things degrade surrogate quality without showing up as hyperparameters:
 
-1. **Phase-1 silent fallback to unconstrained solves.** Per
-   [`dspy_integration_plan.md`](dspy_integration_plan.md) §4, the current
-   `dataset.h5` was produced with the isoflux constraint failing on every
-   sample. The geometry inputs do not faithfully describe the saved ψ.
-   No surrogate hyperparameter recovers from this; the only fix is to
-   regenerate Phase 1 cleanly.
-2. **N=16 is sample-starved.** GP and PCA both degenerate at small N. A
-   regen at N=128 would shift several "best" choices (more PCA components
-   become useful, MLP starts being competitive).
+1. **Phase-1 fallback to unconstrained solves.** An early `dataset.h5` was produced with
+   the isoflux constraint failing on many samples, so the geometry inputs did not faithfully
+   describe the saved ψ. This is no longer *silent*: `run_sweep` now records
+   `n_isoflux_used` in `SweepResult` (`data/schema.py`) and `get_last_solve_info()` exposes
+   the per-solve fallback reason, so a bad batch is visible in the manifest/trace. No
+   surrogate hyperparameter recovers from a fallback-heavy dataset; the fix is still to
+   regenerate Phase 1 (see `probe_feasible.py` to keep shaping inside the feasible box).
+2. **Small N is sample-starved.** GP and PCA both degenerate at small N (the original PoC ran
+   N=16). A regen at N ≥ 128 shifts several "best" choices (more PCA components become useful,
+   MLP starts being competitive) — which is exactly what Phase-1 `n_samples` and Phase-3
+   active-learning enrichment now address.
 
 These two are not knobs in the AutoML sense — they're *prerequisites*. No
 search over Layers C–J can compensate.

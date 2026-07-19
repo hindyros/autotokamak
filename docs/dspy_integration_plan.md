@@ -1,6 +1,6 @@
 # DSPy integration plan for `autotokamak`
 
-Status: proposal, branch `dspy-integration`. Last updated 2026-06-16.
+Status: **implemented** (the meta-action-picker GEPA optimization of §7 and the Phase-2 search-picker are both shipped; see §7 and §10). This document is retained as the design rationale. Last updated 2026-07-18.
 
 This document records why we are (or aren't) pulling DSPy into the agent stack, what we'd actually do with it given the state of the repo today, and the ordering of work.
 
@@ -119,7 +119,7 @@ Optimization:
 
 Deliverables for C:
 - `linter.py` — the DSPy module
-- a CLI: `python -m agent.dspy.linter src/autotokamak/agent/prompts/new_prompt.yaml`
+- a CLI: `python -m autotokamak.agent.dspy.linter src/autotokamak/agent/prompts/new_prompt.yaml`
 - output: predicted score + a list of weak-spot edits
 
 This is a tool you can run *before* burning a $3 agent invocation on a bad prompt. ROI is immediate.
@@ -136,7 +136,7 @@ Once Option C exists and we have ≥10 traces *with execution failures*, the nex
 
 **Status: implemented**. See `src/autotokamak/agent/dspy/{signatures,module,trace_loader,metric_adapter,optimize_meta}.py`. We chose GEPA (Genetic-Pareto) over MIPROv2 because (a) our scorer is multi-criterion — 6 quality terms in `metric_meta.WEIGHTS` — and GEPA can Pareto-optimize without collapsing them, and (b) GEPA's reflective mutation reads the agent's natural-language `diagnosis` field in our traces to inform each prompt mutation.
 
-The optimization target is the meta-action-picker — the LLM call inside `meta_loop.pick_action_via_llm` that decides between `regen_dataset` / `extend_search` / `terminate` each iteration. Its prompt is now `MetaActionPicker.__doc__` in `signatures.py`, and GEPA mutates that docstring.
+The optimization target is the meta-action-picker — the LLM call inside `meta_loop.pick_action_via_llm` that decides between `regen_dataset` / `extend_search` / `enrich_active` / `terminate` each iteration (four actions; `enrich_active` is the active-learning acquisition action). Its prompt is now `MetaActionPicker.__doc__` in `signatures.py`, and GEPA mutates that docstring.
 
 ### Four-command runbook
 
@@ -161,10 +161,10 @@ PYTHONPATH=src/autotokamak python -m autotokamak.agent.dspy.optimize_meta \
 
 The runner picks up the optimized JSON automatically (via `module.load_module()`); pass `--use-baseline` to force the in-code baseline for A/B comparison.
 
-### Deferred Phase-4 follow-ups
+### Phase-4 follow-ups
 
-- **Phase-2 search-picker optimization** — same pattern, new signature for the surrogate_automl agent's per-round SearchSpec decisions.
-- **Phase-1 dataset_generation prompt optimization** — lowest leverage; the prompt is already tight and the main failure is solver-side (the isoflux fallback).
+- **Phase-2 search-picker optimization** — ✅ **shipped**. `SearchRoundPicker` (`signatures.py`) plus `SearchRoundPickerModule`, `load_search_module`, `make_search_decision_fn`, and `DEFAULT_SEARCH_OPTIMIZED_PATH` in `module.py` implement the surrogate_automl agent's per-round `SearchSpec` decisions with the same GEPA pattern.
+- **Phase-1 dataset_generation prompt optimization** — still deferred; lowest leverage; the prompt is already tight and the main failure is solver-side (the isoflux fallback).
 - **Cross-prompt optimization** — once all three phase prompts are DSPy modules, run GEPA jointly over them.
 
 The original "Option A — full-pipeline optimization (destination)" framing (optimize the whole URSA planner instruction string with MIPROv2 + $500-1500 budget) is now superseded by the GEPA-on-meta-action-picker approach, which is cheaper and more contained.
@@ -195,7 +195,9 @@ The original "Option A — full-pipeline optimization (destination)" framing (op
   - `agent/dspy/optimize_meta.py` — CLI script
   - `tools/collect_traces.sh` — drive N varied agent runs for the trainset
 
+- **Phase-2 search-picker (Phase-4 follow-up)**: `SearchRoundPicker` in `signatures.py` + `SearchRoundPickerModule` / `load_search_module` / `make_search_decision_fn` in `module.py`.
+
 **Deferred / not yet implemented:**
 - Option C (`linter.py`) — pre-flight prompt linter
 - Option B — replan-step optimization
-- Phase-2 + Phase-1 prompt optimization via the same GEPA pattern
+- Phase-1 dataset_generation prompt optimization via the same GEPA pattern

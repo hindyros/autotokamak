@@ -14,6 +14,16 @@ from __future__ import annotations
 
 import argparse
 import sys
+import time
+
+
+def _fmt_duration(seconds: float) -> str:
+    s = int(round(seconds))
+    if s < 60:
+        return f"{s}s"
+    if s < 3600:
+        return f"{s // 60}m {s % 60:02d}s"
+    return f"{s // 3600}h {(s % 3600) // 60:02d}m"
 
 
 def _phase1_parser(sub):
@@ -48,6 +58,12 @@ def _meta_parser(sub):
     p.add_argument("--model", default=None, help="LLM model override (e.g. openai:gpt-5-mini)")
     p.add_argument("--dataset", default=None, help="Override initial dataset.h5 path")
     p.add_argument("--target-rmse", type=float, default=None, help="Early-stop when frozen-shard RMSE drops below this")
+    p.add_argument("--target-accuracy-pct", type=float, default=None,
+                   help="Performance stop: stop once the winner is >= this %% better than "
+                        "the baseline mean-predictor (error reduction; e.g. 90). Cap = --max-iterations")
+    p.add_argument("--target-worst-cell-accuracy-pct", type=float, default=None,
+                   help="Performance stop on the weakest geometry region: stop once EVERY eval "
+                        "cell is >= this %% better than its own baseline. Requires eval_envelope.")
     return p
 
 
@@ -64,6 +80,7 @@ def main():
     _meta_parser(sub)
 
     args = parser.parse_args()
+    wall_start = time.time()
 
     if args.pipeline == "phase1":
         from autotokamak.pipelines.phase1 import run_phase1_fast, run_phase1_ursa
@@ -95,7 +112,12 @@ def main():
             model=args.model,
             dataset=args.dataset,
             target_rmse=args.target_rmse,
+            target_accuracy_pct=args.target_accuracy_pct,
+            target_worst_cell_accuracy_pct=args.target_worst_cell_accuracy_pct,
         )
+
+    print(f"[{args.pipeline}/{args.mode}] total wall time: "
+          f"{_fmt_duration(time.time() - wall_start)}")
 
 
 if __name__ == "__main__":
