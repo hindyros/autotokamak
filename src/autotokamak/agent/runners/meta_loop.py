@@ -20,7 +20,7 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 import numpy as np
 from dotenv import load_dotenv
@@ -500,6 +500,7 @@ def run(
     config_path: str,
     *,
     pick_action: ActionPicker = pick_action_via_llm,
+    phase2_decision_fn: Optional[Callable[[dict], Any]] = None,
     trace_enabled: bool = True,
     experiments_dir: Optional[Path] = None,
     model_override: Optional[str] = None,
@@ -527,6 +528,10 @@ def run(
     ``use_baseline_picker=True`` forces the in-code baseline DSPy module
     (ignoring any saved optimized prompt). Used for A/B comparison after
     GEPA optimization.
+
+    ``phase2_decision_fn`` (structured mode only) replaces the DSPy search
+    picker inside nested ``extend_search`` runs — with a scripted policy the
+    whole loop runs LLM-free (level L0).
     """
     if phase2_mode_override is not None and phase2_mode_override not in ("structured", "codegen"):
         raise ValueError(
@@ -596,6 +601,7 @@ def run(
             if phase2_time_budget_override is not None
             else None
         ),
+        phase2_decision_fn=phase2_decision_fn,
         use_baseline_picker=bool(use_baseline_picker),
     )
 
