@@ -56,7 +56,7 @@ class EchoHarness(Harness):
             if src is not None and src.is_file():
                 dst.write_bytes(src.read_bytes())
             elif not dst.exists():
-                dst.write_text("", encoding="utf-8")
+                dst.write_text("echo-harness placeholder\n", encoding="utf-8")
 
         trace.finish_step(
             step, ok=True,

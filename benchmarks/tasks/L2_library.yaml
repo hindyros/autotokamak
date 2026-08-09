@@ -1,29 +1,27 @@
-# just_dspy: single-prompt capability test, DSPy condition.
+# L2 library-assisted capability test (any harness).
 #
-# Same experiment as just_ursa/, third arm: can a DSPy-native agent
-# (typed Signatures + ChainOfThought planner + ReAct executor), given the
-# SAME single task prompt, generate the full codebase and run it to produce
-# the outputs — smart/active data generation against TokaMaker plus ML
-# surrogate training — end to end?
+# Same campaign, evaluation interface, and deliverables as L3_from_scratch —
+# the ONLY difference is access: here the agent MAY (and is advised to) build
+# on the installed `autotokamak` platform library instead of writing physics
+# and ML plumbing from scratch. Comparing L2 vs L3 on the same harness
+# isolates the value of pre-written, proven library code; comparing L2 across
+# harnesses ranks substrates when scaffolding is available.
 #
-# The `problem:` text below is identical to just_ursa/task.yaml except that
-# the URSA-runtime-infrastructure bullet (graph_store.sqlite / ursa_metrics)
-# is dropped — the DSPy harness writes nothing into the workspace.
-#
-# Run (venv active, .env loaded):
-#   python just_dspy/run_just_dspy.py --config just_dspy/task.yaml
-
+# Run:  python -m autotokamak.bench run --task benchmarks/tasks/L2_library.yaml --harness <name>
+task_id: L2_library
+access_level: L2
 problem: |
   TITLE
     Build, end to end, a machine-learning surrogate for fixed-boundary
     Grad-Shafranov tokamak equilibria — including a data-generation
-    campaign with adaptive (active) sampling — from scratch.
+    campaign with adaptive (active) sampling — using the installed
+    `autotokamak` platform library wherever it helps.
 
   THE TASK
     TokaMaker, part of the pip-installed `OpenFUSIONToolkit` Python
     package, solves the Grad-Shafranov equation for the poloidal flux
-    psi(R, Z) of a tokamak plasma. You will use it as your ground-truth
-    physics solver.
+    psi(R, Z) of a tokamak plasma. It is your ground-truth physics
+    solver, and the installed `autotokamak` package already wraps it.
 
     Consider fixed-boundary equilibria of D-shaped plasmas described by
     5 input parameters, with TokaMaker's default pressure/current
@@ -37,9 +35,10 @@ problem: |
       (plasma centered at z0 = 0)
 
     Your job, in full:
-      1. Learn how to drive TokaMaker for fixed-boundary solves (mesh a
-         D-shaped last-closed-flux-surface, solve, extract psi). Choose
-         your own numerical resolution; a single solve should take
+      1. Drive the solver for fixed-boundary solves. You may use
+         `autotokamak.data.sweep.run_sweep` (config-driven sweeps; also
+         accepts an explicit (N, 5) sample matrix), or go through
+         `autotokamak.core` directly. A single solve should take
          seconds, not minutes.
       2. Design and run a DATA-GENERATION CAMPAIGN structured as an
          initial space-filling design followed by UP TO 10 ADAPTIVE
@@ -47,23 +46,25 @@ problem: |
          (failed/unconverged solves count against a round's 500).
          A one-shot space-filling or random design alone is NOT
          sufficient: each round's 500 new solver evaluations must be
-         chosen ADAPTIVELY, informed by the current model or data (your
-         strategy — e.g. uncertainty, model error, disagreement,
-         anything you can justify). STOPPING CRITERION: keep a held-out
-         VALIDATION set (separate from the final test set of step 4,
-         which must never influence the campaign); after each round,
-         retrain your surrogate and stop the campaign early once its
-         validation error is reduced by at least 70% relative to the
-         mean-predictor baseline (a model that always predicts the
-         training-set mean psi map), i.e. val_error <= 0.30 *
-         baseline_error. Otherwise continue to the 10-round cap. Log
-         every acquisition decision (which point, when, why) and each
-         round's validation error vs baseline to an acquisition log
-         file.
+         chosen ADAPTIVELY, informed by the current model or data
+         (`autotokamak.data.acquire` implements residual-UCB and PCA-GP
+         variance acquisition you may reuse, or bring your own).
+         STOPPING CRITERION: keep a held-out VALIDATION set (separate
+         from the final test set of step 4, which must never influence
+         the campaign); after each round, retrain your surrogate and
+         stop the campaign early once its validation error is reduced
+         by at least 70% relative to the mean-predictor baseline (a
+         model that always predicts the training-set mean psi map),
+         i.e. val_error <= 0.30 * baseline_error. Otherwise continue to
+         the 10-round cap. Log every acquisition decision (which point,
+         when, why) and each round's validation error vs baseline to an
+         acquisition log file.
       3. Train an ML surrogate mapping the 5 parameters to the PHYSICAL
          poloidal flux psi(R, Z) in Webers (not a normalized flux).
-         Model family, input/output representation, and training
-         procedure are entirely your choice.
+         `autotokamak.surrogate` provides dataset loading, PCA
+         reduction, a model zoo (GP, kernel ridge, polynomial ridge,
+         MLP), and Optuna search; model family and representation
+         remain entirely your choice.
       4. Evaluate honestly on a held-out test set of AT LEAST 60 solver
          runs at uniformly random parameters (fixed recorded seed),
          generated independently and never used for training, model
@@ -116,39 +117,24 @@ problem: |
 
   ENVIRONMENT FACTS
     * Your current working directory IS your workspace. Create all files
-      here. Do not read, copy, or import code from the surrounding
-      repository. In particular the Python environment contains an
-      installed package called `autotokamak` that solves a related
-      problem — importing it, reading its source, or reusing its
-      artifacts is FORBIDDEN: this is a from-scratch capability test,
-      and only `OpenFUSIONToolkit` may be used for physics.
+      here.
     * `python` resolves to a Python 3.11 venv that already has:
       numpy, scipy, h5py, matplotlib, pyyaml, scikit-learn, torch,
-      optuna, OpenFUSIONToolkit. Nothing may be installed.
-    * A read-only `./OpenFUSIONToolkit/` symlink to the full OFT
-      source tree is present in your workspace. BEFORE writing any
-      solver or meshing code, study the worked TokaMaker examples
-      under `OpenFUSIONToolkit/src/examples/TokaMaker/` (the
-      `fixed_boundary/` example is directly relevant) and follow the
-      workflow they demonstrate rather than inventing your own
-      solver-facing plumbing.
+      optuna, OpenFUSIONToolkit, and the `autotokamak` platform library
+      (importable; using it is ALLOWED and RECOMMENDED — that is the
+      point of this condition). Nothing may be installed.
+    * Useful autotokamak entry points: `autotokamak.data.sweep.run_sweep`
+      (sweep or explicit-matrix solves → HDF5),
+      `autotokamak.data.acquire` (acquisition strategies),
+      `autotokamak.surrogate.dataset/reduce/zoo/optuna_search/automl_loop`
+      (loading, PCA, model factories, search). Read their docstrings.
     * TokaMaker limitation: only ONE `OFT_env` may ever be created per
-      Python process. Structure your code so the environment object is
-      created once and reused across all solves in a process, or run
-      solves in child processes.
+      Python process. `autotokamak.core.solver.make_solver` handles
+      reuse via its `env=` argument; if you bypass autotokamak, create
+      the environment object once and reuse it, or run solves in child
+      processes.
 
   CONSTRAINTS
-    * MESHING MILESTONE (mandatory, before any campaign code): locate
-      the fixed-boundary example under
-      `OpenFUSIONToolkit/src/examples/TokaMaker/`, reproduce its
-      mesh-and-solve workflow as a standalone script in your workspace,
-      run it, and verify it produces finite psi values. Only then
-      generalize it to your parameterized D-shape. Do not design your
-      own meshing approach when the examples demonstrate one.
-    * Do NOT construct the computational mesh yourself (e.g. via scipy
-      Delaunay) and pass raw triangles to the solver — TokaMaker
-      validates mesh topology and will reject hand-built
-      triangulations. Use the meshing route the OFT examples use.
     * PILOT GATE (mandatory): before the campaign, run a pilot of at
       least 20 solves at random parameters. If the success rate is
       below 50%, STOP, diagnose the per-failure error messages, fix,
@@ -157,34 +143,28 @@ problem: |
     * Do not run `pip install` or modify the environment.
     * Do not call `git`.
     * Do not prompt for user input; the task is fully autonomous.
+    * Do not modify the installed autotokamak/OpenFUSIONToolkit
+      packages; use them as libraries.
     * If errors arise, debug, fix your code, and re-run. Stay within
       the campaign structure above (at most 10 adaptive rounds x 500
       solves, plus the initial design and validation/test sets) across
       ALL attempts that reach the solver.
-
-workspace: just_dspy/workspace
-
-# litellm model string (note: slash format, unlike URSA's langchain colon)
-model: openai/gpt-5.2
-lm:
-  temperature: 1.0
-  max_tokens: 32000
-
-# ReAct tool-loop budget per plan step
-max_iters_per_step: 40
-
-# Post-run review: how many fix-up ReAct rounds if deliverables are missing.
-# Set to 0 for strict parity with the URSA single-pass condition.
-fix_rounds: 1
-
 expected_artifacts:
   - report.json
   - predict.py
   - README.md
-
 symlinks:
-  # Reference docs only. Warn-skipped if the side-clone is absent —
-  # `git clone https://github.com/OpenFUSIONToolkit/OpenFUSIONToolkit.git`
-  # at the repo root first if you want the agent to have OFT source docs.
   - source: ./OpenFUSIONToolkit
     dest: OpenFUSIONToolkit
+model:
+  ursa: openai:gpt-5.2
+  dspy: openai/gpt-5.2
+harness_notes:
+  ursa: |
+    URSA RUNTIME NOTE
+      `graph_store.sqlite` and `ursa_metrics/` in the workspace are
+      agent-runtime infrastructure; their presence is expected. Ignore
+      them entirely: do not read, write, delete, test, or build any
+      guard/tooling around them.
+timeout_seconds: 21600
+feedback_rounds: 2

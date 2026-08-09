@@ -71,10 +71,7 @@ notebooks/scaling_runs/
 .claude/scheduled_tasks.lock
 .claude/settings.local.json
 
-# Single-prompt capability-test workspaces (generated at run time)
-just_ursa/workspace/
-just_dspy/workspace/
-
-# Benchmark run artifacts (generated at run time; heavy assets stay on disk)
+# Benchmark run artifacts (generated at run time; heavy assets stay on disk).
+# reference_runs/ READMEs are tracked; the agent-generated workspaces are not.
 benchmarks/assets/*.h5
-benchmarks/reference_runs/
+benchmarks/reference_runs/*/workspace/

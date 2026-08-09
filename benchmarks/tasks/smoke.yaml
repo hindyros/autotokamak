@@ -1,0 +1,14 @@
+# Harness smoke test: cheapest possible end-to-end verification that an
+# adapter can auth, receive a prompt, act in the workspace, and exit cleanly.
+# Run it against every new harness BEFORE spending money on a real campaign:
+#   python -m autotokamak.bench run --task benchmarks/tasks/smoke.yaml --harness <name>
+task_id: smoke
+access_level: L3
+problem: |
+  Create a file named hello.txt in your current working directory containing
+  exactly the two characters: OK
+  Then verify the file exists and its content is correct. Do nothing else.
+expected_artifacts:
+  - hello.txt
+timeout_seconds: 600
+feedback_rounds: 1
