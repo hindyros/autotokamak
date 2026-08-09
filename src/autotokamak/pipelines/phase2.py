@@ -70,7 +70,7 @@ def run_phase2(
     manifest_extra = {
         "dataset_h5": str(dataset_h5),
         "policy": policy_kind,
-        "winner_model": result.get("winner", {}).get("model_name") if result.get("winner") else None,
+        "winner_model": (result.get("winner") or {}).get("winner_model_name"),
         "val_psi_rmse": result.get("val_psi_rmse"),
         "test_psi_rmse": result.get("test_psi_rmse"),
         "baseline_mean_psi_rmse": result.get("baseline_mean_psi_rmse"),

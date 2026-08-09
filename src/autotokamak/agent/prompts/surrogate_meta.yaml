@@ -25,7 +25,7 @@ seed: 0
 # the WEAKEST geometry cell clears the bar vs its own baseline —
 #   target_worst_cell_accuracy_pct: 80    # every region >= 80% error reduction
 
-initial_dataset_h5: examples/dataset_generation/fast/outputs/dataset.h5
+initial_dataset_h5: examples/dataset_generation/L0/outputs/dataset.h5
 base_sweep_config: examples/dataset_generation/dataset_config.yaml
 phase2_prompt: src/autotokamak/agent/prompts/surrogate_automl.yaml
 
