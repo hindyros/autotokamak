@@ -37,9 +37,12 @@ notes/
 # Run outputs (generated, never commit)
 outputs/
 
-# Pipeline mode outputs — examples/<workspace>/fast/ and ursa/ are live run artifacts
+# Pipeline level outputs — examples/<workspace>/<level>/ are live run artifacts
 examples/*/fast/
 examples/*/ursa/
+examples/*/L0/
+examples/*/L1/
+examples/*/L2-*/
 
 # URSA runtime scratch (created inside agent workspaces)
 graph_store.sqlite
@@ -71,3 +74,7 @@ notebooks/scaling_runs/
 # Single-prompt capability-test workspaces (generated at run time)
 just_ursa/workspace/
 just_dspy/workspace/
+
+# Benchmark run artifacts (generated at run time; heavy assets stay on disk)
+benchmarks/assets/*.h5
+benchmarks/reference_runs/
