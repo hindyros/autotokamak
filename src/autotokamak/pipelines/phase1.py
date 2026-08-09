@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Phase-1 dataset generation dispatcher.
 
 fast mode: calls autotokamak.data.sweep.run_sweep directly.

@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Atomic file I/O for run artifacts.
 
 Why atomic: a 1000-case sweep that crashes mid-write leaves a corrupted .npz on

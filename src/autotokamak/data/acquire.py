@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Active-learning acquisition: pick the next OFT solve points on purpose.
 
 Phase-1 sweeps sample the (r0, a, kappa, delta, Ip) space blindly (LHS /

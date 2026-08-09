@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Meta-loop dispatcher.
 
 fast mode: meta_loop.run() with phase2_mode="structured" (Optuna library, DSPy decisions).
@@ -21,6 +22,7 @@ def run_meta(
     mode: str,
     max_iterations: int = 3,
     n_samples: Optional[int] = None,
+    enrich_n_new: Optional[int] = None,
     time_budget: int = 600,
     model: Optional[str] = None,
     dataset: Optional[str] = None,
@@ -53,6 +55,7 @@ def run_meta(
         phase2_mode_override=phase2_mode,
         max_iterations_override=max_iterations,
         n_samples_override=n_samples,
+        enrich_n_new_override=enrich_n_new,
         phase2_time_budget_override=time_budget,
         model_override=model,
         target_rmse_override=target_rmse,
@@ -72,6 +75,7 @@ def run_meta(
         "winner_model_name": getattr(report, "winner_model_name", None),
         "phase2_mode": phase2_mode,
         "max_iterations": max_iterations,
+        "enrich_n_new": enrich_n_new,
         "time_budget_seconds": time_budget,
     }
     p = write_manifest(out_dir, pipeline="meta", mode=mode, **manifest_extra)

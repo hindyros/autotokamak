@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Pydantic v2 schemas for surrogate AutoML configs and outputs.
 
 Mirrors the pattern in ``autotokamak.core.schema``:

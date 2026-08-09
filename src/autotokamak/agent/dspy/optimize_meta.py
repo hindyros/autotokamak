@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """GEPA optimization CLI for the meta-action-picker prompt.
 
 Usage::

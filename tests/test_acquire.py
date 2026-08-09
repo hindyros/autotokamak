@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Tests for the active-learning acquisition module (``data.acquire``).
 
 All synthetic, no OFT: inputs live in [0,1]^5, psi fields are smooth

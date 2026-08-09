@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Evaluate a trained surrogate and dump diagnostic plots.
 
 Usage:

@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Entry point: python -m autotokamak.pipelines <phase1|phase2|meta> --mode <fast|ursa>
 
 Examples:
@@ -54,6 +55,8 @@ def _meta_parser(sub):
                    help="fast=structured library loop, ursa=hybrid (meta-agent via DSPy, nested Phase-2 via URSA)")
     p.add_argument("--max-iterations", type=int, default=3, help="Max meta-loop iterations")
     p.add_argument("--n-samples", type=int, default=None, help="Samples per regen_dataset action")
+    p.add_argument("--enrich-n-new", type=int, default=None,
+                   help="Force every enrich_active action to acquire exactly this many samples")
     p.add_argument("--time-budget", type=int, default=600, help="Phase-2 Optuna budget per iteration (fast only)")
     p.add_argument("--model", default=None, help="LLM model override (e.g. openai:gpt-5-mini)")
     p.add_argument("--dataset", default=None, help="Override initial dataset.h5 path")
@@ -108,6 +111,7 @@ def main():
             mode=args.mode,
             max_iterations=args.max_iterations,
             n_samples=args.n_samples,
+            enrich_n_new=args.enrich_n_new,
             time_budget=args.time_budget,
             model=args.model,
             dataset=args.dataset,

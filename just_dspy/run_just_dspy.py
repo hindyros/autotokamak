@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# provenance: Human/Claude-authored (DSPy capability-test harness; drives the DSPy agent)
 """just_dspy runner: a DSPy-native plan->execute agent for the single-prompt
 surrogate-campaign capability test.
 

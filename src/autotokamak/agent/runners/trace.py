@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Structured per-run tracing for the agent runners.
 
 Why this exists

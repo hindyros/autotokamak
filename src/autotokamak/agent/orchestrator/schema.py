@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Pydantic schemas for the meta-agent: config, decisions, per-iteration records.
 
 The LLM's structured output schema is ``ActionDecision`` — the meta-loop forces
@@ -56,7 +57,7 @@ class EnrichActivePayload(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
     n_new: int = Field(
-        default=100,
+        default=500,
         ge=1,
         le=2000,
         description="How many acquisition-selected samples to solve and append.",
@@ -168,6 +169,14 @@ class MetaConfig(BaseModel):
         "legacy nested plan_execute_feedback agent.",
     )
     phase2_max_rounds: int = Field(default=3, ge=1, le=10)
+    enrich_n_new: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=2000,
+        description="When set, force every enrich_active action to acquire "
+        "exactly this many samples (experiment control; overrides the "
+        "picker's chosen n_new).",
+    )
     holdout_test_frac: float = Field(
         default=0.15,
         gt=0.0,

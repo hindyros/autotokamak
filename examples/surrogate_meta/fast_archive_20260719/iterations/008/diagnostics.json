@@ -1,0 +1,80 @@
+{
+  "learning_curve": {
+    "curve": {
+      "8": 0.008745530815138576,
+      "12": 0.0024098624470484695,
+      "16": 0.002314198319513215
+    },
+    "slope_log_log": -0.14080245014324452,
+    "plateau_detected": false,
+    "interpretation": "RMSE still dropping with N \u2192 sample-bottlenecked; regenerate at higher N"
+  },
+  "cross_seed_variance": {
+    "per_seed": {
+      "0": 0.0013934709046622095,
+      "1": 0.001392098887267827,
+      "2": 0.001395455860532989
+    },
+    "mean_rmse": 0.001393675217487675,
+    "cv": 0.000988804529117757,
+    "high_variance": false,
+    "interpretation": "splits stable \u2192 measurement is meaningful"
+  },
+  "pca_spectrum": {
+    "explained_per_component": [
+      0.3302962290204853,
+      0.19708447501246143,
+      0.12884790019099024,
+      0.07717083620205088,
+      0.03850502784316116,
+      0.027976062988446515,
+      0.021211394674133015,
+      0.017470571386569142,
+      0.013529947582461918,
+      0.012538156522703243,
+      0.009439473071204092,
+      0.00884288301360978,
+      0.007160935697798152,
+      0.006055508517347485,
+      0.005064331962971231,
+      0.0048075600233779565
+    ],
+    "cumulative": [
+      0.3302962290204853,
+      0.5273807040329467,
+      0.6562286042239369,
+      0.7333994404259878,
+      0.7719044682691489,
+      0.7998805312575954,
+      0.8210919259317284,
+      0.8385624973182976,
+      0.8520924449007595,
+      0.8646306014234628,
+      0.8740700744946669,
+      0.8829129575082767,
+      0.8900738932060749,
+      0.8961294017234224,
+      0.9011937336863935,
+      0.9060012937097716
+    ],
+    "n_components_for_95pct": null,
+    "tail_energy_above_8": 0.06743879639147386,
+    "interpretation": "max_components insufficient to reach 95% variance \u2014 increase n_pca_components"
+  },
+  "residual_structure": {
+    "mean_abs_residual_per_sample": [
+      0.0002537425065581382,
+      0.0002473417949664494
+    ],
+    "input_correlations": {
+      "r0": 1.0,
+      "a": 1.0,
+      "kappa": -1.0,
+      "delta": 1.0,
+      "Ip": 1.0
+    },
+    "spatial_pattern_variance": 1.6363112007483012e-07,
+    "spatial_pattern_mean": 0.00028263877828579056,
+    "interpretation": "residual correlates strongly with r0,a,kappa,delta,Ip"
+  }
+}

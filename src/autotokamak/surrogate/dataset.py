@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Dataset loading and splitting for surrogate training.
 
 The Phase-1 prompt produces ``examples/dataset_generation/outputs/dataset.h5``

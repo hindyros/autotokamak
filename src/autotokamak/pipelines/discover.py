@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Locate a run's artifacts (dataset, eval set, winner, report) across the two
 workspace layouts the platform produces.
 

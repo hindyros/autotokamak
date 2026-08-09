@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Shared utilities for all pipeline dispatchers."""
 from __future__ import annotations
 

@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """End-to-end meta-loop test with a scripted action picker.
 
 Bypasses the LLM by supplying a hand-written ``ActionPicker`` to

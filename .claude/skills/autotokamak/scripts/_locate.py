@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Shared repo-locate + env-header helpers for autotokamak Skill scripts.
 
 Every Skill wrapper imports from this module. The wrappers themselves never

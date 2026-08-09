@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """PCA reduction for ψ(R,Z) fields.
 
 ψ is 96×64 ≈ 6k outputs per sample. Direct multi-output regression on 6k

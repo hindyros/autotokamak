@@ -1,0 +1,14 @@
+{
+  "action": "enrich_active",
+  "regen": null,
+  "enrich": {
+    "n_new": 120,
+    "strategy": "residual_ucb",
+    "beta": 0.7,
+    "feasibility_weighting": true,
+    "rationale": "Residual-UCB active enrichment will place the last batch in regions of demonstrably high error along those input directions, maximizing the chance of closing the small remaining gap to the target RMSE in a single iteration."
+  },
+  "extend": null,
+  "terminate": null,
+  "diagnosis": "Residuals remain structured and strongly correlated with core inputs (r0/a/kappa/delta/Ip) while the learning curve is still improving and cross-seed variance is low, indicating a data/coverage bottleneck rather than tuning noise."
+}

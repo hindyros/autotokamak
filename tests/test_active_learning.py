@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Tests for the residual-driven active-learning stack.
 
 Covers the four new pieces (design doc ``docs/active_learning_design.md``):

@@ -41,15 +41,25 @@ problem: |
          D-shaped last-closed-flux-surface, solve, extract psi). Choose
          your own numerical resolution; a single solve should take
          seconds, not minutes.
-      2. Design and run a DATA-GENERATION CAMPAIGN under a hard budget
-         of AT MOST 400 solver runs total (training + validation + test
-         combined; failed/unconverged solves count against the budget).
+      2. Design and run a DATA-GENERATION CAMPAIGN structured as an
+         initial space-filling design followed by UP TO 10 ADAPTIVE
+         (ACTIVE-SAMPLING) ROUNDS of EXACTLY 500 new solver runs each
+         (failed/unconverged solves count against a round's 500).
          A one-shot space-filling or random design alone is NOT
-         sufficient: after an initial design, you must choose later
-         solver evaluations ADAPTIVELY, informed by the current model
-         or data (your strategy — e.g. uncertainty, model error,
-         disagreement, anything you can justify). Log every acquisition
-         decision (which point, when, why) to an acquisition log file.
+         sufficient: each round's 500 new solver evaluations must be
+         chosen ADAPTIVELY, informed by the current model or data (your
+         strategy — e.g. uncertainty, model error, disagreement,
+         anything you can justify). STOPPING CRITERION: keep a held-out
+         VALIDATION set (separate from the final test set of step 4,
+         which must never influence the campaign); after each round,
+         retrain your surrogate and stop the campaign early once its
+         validation error is reduced by at least 70% relative to the
+         mean-predictor baseline (a model that always predicts the
+         training-set mean psi map), i.e. val_error <= 0.30 *
+         baseline_error. Otherwise continue to the 10-round cap. Log
+         every acquisition decision (which point, when, why) and each
+         round's validation error vs baseline to an acquisition log
+         file.
       3. Train an ML surrogate mapping the 5 parameters to the PHYSICAL
          poloidal flux psi(R, Z) in Webers (not a normalized flux).
          Model family, input/output representation, and training
@@ -115,20 +125,42 @@ problem: |
     * `python` resolves to a Python 3.11 venv that already has:
       numpy, scipy, h5py, matplotlib, pyyaml, scikit-learn, torch,
       optuna, OpenFUSIONToolkit. Nothing may be installed.
-    * If a `./OpenFUSIONToolkit/` directory is present in your
-      workspace, it is a read-only symlink to the OFT source tree —
-      use its Python examples/docs as reference material.
+    * A read-only `./OpenFUSIONToolkit/` symlink to the full OFT
+      source tree is present in your workspace. BEFORE writing any
+      solver or meshing code, study the worked TokaMaker examples
+      under `OpenFUSIONToolkit/src/examples/TokaMaker/` (the
+      `fixed_boundary/` example is directly relevant) and follow the
+      workflow they demonstrate rather than inventing your own
+      solver-facing plumbing.
     * TokaMaker limitation: only ONE `OFT_env` may ever be created per
       Python process. Structure your code so the environment object is
       created once and reused across all solves in a process, or run
       solves in child processes.
 
   CONSTRAINTS
+    * MESHING MILESTONE (mandatory, before any campaign code): locate
+      the fixed-boundary example under
+      `OpenFUSIONToolkit/src/examples/TokaMaker/`, reproduce its
+      mesh-and-solve workflow as a standalone script in your workspace,
+      run it, and verify it produces finite psi values. Only then
+      generalize it to your parameterized D-shape. Do not design your
+      own meshing approach when the examples demonstrate one.
+    * Do NOT construct the computational mesh yourself (e.g. via scipy
+      Delaunay) and pass raw triangles to the solver — TokaMaker
+      validates mesh topology and will reject hand-built
+      triangulations. Use the meshing route the OFT examples use.
+    * PILOT GATE (mandatory): before the campaign, run a pilot of at
+      least 20 solves at random parameters. If the success rate is
+      below 50%, STOP, diagnose the per-failure error messages, fix,
+      and re-run the pilot. Never start the 500-solve rounds while the
+      pilot is failing.
     * Do not run `pip install` or modify the environment.
     * Do not call `git`.
     * Do not prompt for user input; the task is fully autonomous.
     * If errors arise, debug, fix your code, and re-run. Stay within
-      the 400-solve budget across ALL attempts that reach the solver.
+      the campaign structure above (at most 10 adaptive rounds x 500
+      solves, plus the initial design and validation/test sets) across
+      ALL attempts that reach the solver.
 
 workspace: just_dspy/workspace
 

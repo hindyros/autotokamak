@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Palantir-styled HTML report for an autotokamak agent run.
 
 Produces a single self-contained HTML file (all CSS inline, images

@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Plasma boundary (LCFS) construction and 2D triangular meshing.
 
 Both example runners pre-refactor reimplemented these calls. After this refactor,

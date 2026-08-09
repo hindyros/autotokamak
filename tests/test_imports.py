@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Every public submodule of autotokamak must import without side effects."""
 
 import importlib

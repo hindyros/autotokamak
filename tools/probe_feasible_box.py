@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Probe which parameter box gives a clean isoflux success rate.
 
 For each candidate box, draw N LHS samples and run solve_equilibrium.

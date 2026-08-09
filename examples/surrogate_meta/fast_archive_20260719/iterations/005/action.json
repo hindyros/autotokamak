@@ -1,0 +1,14 @@
+{
+  "action": "enrich_active",
+  "regen": null,
+  "enrich": {
+    "n_new": 250,
+    "strategy": "residual_ucb",
+    "beta": 0.6,
+    "feasibility_weighting": true,
+    "rationale": "Residual-driven active learning directly targets the high-error regions implied by the correlated residual structure, providing more RMSE reduction per added solve than blind sampling or additional tuning at this stage."
+  },
+  "extend": null,
+  "terminate": null,
+  "diagnosis": "The bottleneck is still data coverage in specific input directions (r0/a/kappa/delta/Ip) with stable measurement, leading to structured residuals and slowed RMSE improvement."
+}

@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """DSPy signatures for the meta-agent's optimizable LLM calls.
 
 The signature's **docstring** is the prompt GEPA mutates. The fields are

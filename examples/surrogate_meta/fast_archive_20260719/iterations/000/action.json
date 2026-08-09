@@ -1,0 +1,20 @@
+{
+  "action": "extend_search",
+  "regen": null,
+  "enrich": null,
+  "extend": {
+    "models_to_emphasize": [],
+    "widen_params": [
+      "model.n_pca_components",
+      "model.hidden_width",
+      "model.hidden_depth",
+      "model.dropout",
+      "training.weight_decay",
+      "training.lr"
+    ],
+    "n_trials_hint": 80,
+    "rationale": "Running an initial model/hyperparameter search establishes a winner.pkl and residuals, enabling subsequent iterations to decide between targeted active enrichment versus further tuning or sweep reconfiguration."
+  },
+  "terminate": null,
+  "diagnosis": "No tuned surrogate baseline exists yet (cold start), so current diagnostics cannot distinguish tuning-limited vs data-limited performance for the real model family."
+}

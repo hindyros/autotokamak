@@ -9,7 +9,7 @@ same job from one prompt**, with no access to any of that scaffolding?
 
 This folder is that experiment. [task.yaml](task.yaml) contains the single
 prompt. It specifies *the task* (surrogate for fixed-boundary Grad–Shafranov
-ψ(R,Z), adaptive sampling under a 400-solve budget, honest held-out
+ψ(R,Z), adaptive sampling (up to 10 rounds x 500 solves, 70% error-reduction early stop), honest held-out
 evaluation) and *the evaluation interface* (fixed grid, relative-L2 metric,
 `predict.py` contract) — and deliberately **nothing** about how this repo
 solves it: no `autotokamak.core` API, no dataset schema, no sampling method,
@@ -32,11 +32,11 @@ source venv/bin/activate
 set -a && source .env && set +a
 
 # Primary condition: single-pass plan -> execute (purest one-shot test)
-PYTHONPATH=src/autotokamak python -m agent.runners.plan_execute \
+python -m autotokamak.agent.runners.plan_execute \
     --config just_ursa/task.yaml
 
 # Optional second condition: with replan/feedback rounds
-PYTHONPATH=src/autotokamak python -m agent.runners.plan_execute_feedback \
+python -m autotokamak.agent.runners.plan_execute_feedback \
     --config just_ursa/task.yaml
 ```
 

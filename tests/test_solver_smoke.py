@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Full TokaMaker solve smoke test. Marked @pytest.mark.slow so default `pytest` skips it.
 
 Run with: ``pytest tests/ -v -m slow``

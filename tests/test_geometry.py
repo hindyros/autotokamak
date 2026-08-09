@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Smoke tests for autotokamak.core.geometry — LCFS construction shape and bounds."""
 
 import numpy as np

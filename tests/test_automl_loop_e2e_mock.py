@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """End-to-end tests for the structured AutoML loop with a scripted decision_fn.
 
 No LLM: decisions are supplied by plain functions, mirroring how

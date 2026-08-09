@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Core utilities shared across examples, surrogate training, and agentic runners.
 
 Submodules:

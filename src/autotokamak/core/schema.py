@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Pydantic v2 config models for equilibrium runs.
 
 Replaces the ad-hoc ``_m``, ``_req``, ``_num``, ``_int`` helpers in the

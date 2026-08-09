@@ -1,0 +1,14 @@
+{
+  "action": "enrich_active",
+  "regen": null,
+  "enrich": {
+    "n_new": 200,
+    "strategy": "residual_ucb",
+    "beta": 0.6,
+    "feasibility_weighting": true,
+    "rationale": "Residual-UCB active learning will concentrate new solves in the parameter directions where out-of-fold errors are largest, giving the best chance to close the remaining RMSE gap within the limited iterations."
+  },
+  "extend": null,
+  "terminate": null,
+  "diagnosis": "The surrogate remains sample-bottlenecked with structured residuals strongly tied to specific inputs (r0/a/kappa/delta/Ip), rather than tuning noise or split instability."
+}

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Feasibility scan for equilibrium shaping bounds.
 
 Wraps tools/probe_feasible_box.py. Reports the isoflux-used fraction across

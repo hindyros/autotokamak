@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Single source of truth for the meta-action-picker's LM inputs.
 
 Train/serve skew fix (2026-07-10): the runtime picker

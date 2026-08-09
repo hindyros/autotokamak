@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Tests for the ``enrich_active`` meta-action (dispatcher + DSPy coercion).
 
 The OFT solver never runs: ``actions.run_sweep`` is monkeypatched with a

@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# provenance: URSA-generated, then hand/Claude-refactored to route through autotokamak.core
 """Config-driven TokaMaker fixed-boundary Grad–Shafranov equilibrium.
 
 Reads a YAML config specifying:

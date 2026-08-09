@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Best-effort score dispatch for the runners.
 
 Each prompt YAML may declare a ``scorer:`` dotted path to a function with the

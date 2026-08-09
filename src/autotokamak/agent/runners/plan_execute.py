@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Plan -> execute runner (single pass, no replan loop).
 
 For the version with re-planning after execution, see

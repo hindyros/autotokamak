@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Meta-loop runner — the autonomous outer loop above Phase-2.
 
 Per iteration:
@@ -504,6 +505,7 @@ def run(
     model_override: Optional[str] = None,
     max_iterations_override: Optional[int] = None,
     n_samples_override: Optional[int] = None,
+    enrich_n_new_override: Optional[int] = None,
     phase2_time_budget_override: Optional[int] = None,
     use_baseline_picker: bool = False,
     workspace_override: Optional[str] = None,
@@ -534,6 +536,7 @@ def run(
     overrides = {
         "model": model_override,
         "max_iterations": max_iterations_override,
+        "enrich_n_new": enrich_n_new_override,
         "phase2_mode": phase2_mode_override,
         "target_rmse": target_rmse_override,
         "target_rmse_ratio": target_rmse_ratio_override,
@@ -701,6 +704,20 @@ def run(
                 history.append(record)
                 terminated_by = "agent"
                 break
+
+            # Experiment control: a configured enrich_n_new pins the batch
+            # size of every enrich_active action, overriding the picker.
+            if (
+                meta_config.enrich_n_new is not None
+                and decision.action == "enrich_active"
+                and decision.enrich is not None
+                and decision.enrich.n_new != meta_config.enrich_n_new
+            ):
+                print(
+                    f"  enrich_n_new override: picker chose {decision.enrich.n_new}, "
+                    f"forcing {meta_config.enrich_n_new}"
+                )
+                decision.enrich.n_new = meta_config.enrich_n_new
 
             try:
                 result = dispatch(decision, state)
@@ -930,6 +947,13 @@ def main():
              "(effective on the next regen_dataset action).",
     )
     parser.add_argument(
+        "--enrich-n-new",
+        type=int,
+        default=None,
+        help="Force every enrich_active action to acquire exactly this many "
+             "samples (overrides the picker's chosen n_new).",
+    )
+    parser.add_argument(
         "--time-budget-seconds",
         type=int,
         default=None,
@@ -1003,6 +1027,7 @@ def main():
         model_override=args.model,
         max_iterations_override=args.max_iterations,
         n_samples_override=args.n_samples,
+        enrich_n_new_override=args.enrich_n_new,
         phase2_time_budget_override=args.time_budget_seconds,
         use_baseline_picker=args.use_baseline,
         workspace_override=args.workspace,

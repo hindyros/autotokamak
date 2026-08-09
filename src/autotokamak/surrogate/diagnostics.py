@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Bottleneck diagnostics for the meta-agent.
 
 Each function returns a JSON-serializable dict. The meta-agent reads these

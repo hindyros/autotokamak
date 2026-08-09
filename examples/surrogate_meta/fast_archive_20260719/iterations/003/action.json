@@ -1,0 +1,14 @@
+{
+  "action": "enrich_active",
+  "regen": null,
+  "enrich": {
+    "n_new": 200,
+    "strategy": "residual_ucb",
+    "beta": 0.6,
+    "feasibility_weighting": true,
+    "rationale": "Residual-driven active learning will preferentially add solves where the model’s out-of-fold error is predicted highest in those correlated input regions, yielding better RMSE reduction per new sample than blind regeneration or more tuning."
+  },
+  "extend": null,
+  "terminate": null,
+  "diagnosis": "The current bottleneck is sample coverage in specific input directions (r0/a/kappa/delta/Ip) causing structured residuals, not split noise or hyperparameter plateauing."
+}

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Render experiments/*/trace.json into a browsable static HTML report.
 
 Wraps tools/trace_to_html.py.

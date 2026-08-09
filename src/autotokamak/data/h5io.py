@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Canonical HDF5 read/write/merge/split helpers for Phase-1 datasets.
 
 The dataset layout (written by ``data.sweep.run_sweep`` and the agent-authored

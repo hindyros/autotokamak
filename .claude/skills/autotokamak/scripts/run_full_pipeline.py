@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Full pipeline: Phase-1 dataset → Phase-2 surrogate → eval → HTML report.
 
 Wraps tools/run_full_pipeline.py. Passes through all its flags.

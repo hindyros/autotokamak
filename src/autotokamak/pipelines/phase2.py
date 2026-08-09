@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Phase-2 surrogate AutoML dispatcher.
 
 fast mode: calls autotokamak.surrogate.automl_loop.run_automl_loop directly.

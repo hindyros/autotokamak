@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Library smoke test for the five bottleneck diagnostics.
 
 Uses the synthetic low-rank fixture from ``test_surrogate_smoke.py`` so this

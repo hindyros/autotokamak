@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """DSPy module wrapping the meta-action-picker signature.
 
 The module's predict step is what GEPA mutates: the signature docstring

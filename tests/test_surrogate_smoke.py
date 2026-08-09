@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Library smoke tests for the Phase-2 surrogate stack.
 
 These exercise eval/ + surrogate/ end-to-end with a tiny synthetic dataset

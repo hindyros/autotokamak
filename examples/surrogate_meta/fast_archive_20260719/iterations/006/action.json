@@ -1,0 +1,14 @@
+{
+  "action": "enrich_active",
+  "regen": null,
+  "enrich": {
+    "n_new": 200,
+    "strategy": "residual_ucb",
+    "beta": 0.6,
+    "feasibility_weighting": true,
+    "rationale": "Residual-driven active learning will preferentially add solves where the current winner demonstrably errs, accelerating RMSE reduction compared with blind dataset regeneration or further tuning."
+  },
+  "extend": null,
+  "terminate": null,
+  "diagnosis": "The run is sample-bottlenecked with persistent, input-correlated residual structure (r0/a/kappa/delta/Ip) while validation noise is low, so errors are driven by under-covered/weak regions rather than tuning."
+}

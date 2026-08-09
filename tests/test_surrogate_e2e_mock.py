@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """End-to-end mock of the Phase-2 pipeline against the real Phase-1 dataset.
 
 Simulates what the agent's runner would produce, without invoking the LLM:

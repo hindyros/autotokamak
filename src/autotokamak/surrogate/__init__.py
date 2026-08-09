@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Structured Phase-2 surrogate AutoML: sklearn model zoo + Optuna search.
 
 Submodules:

@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Library-level smoke test for the extracted Phase-1 sweep.
 
 Exercises ``data.schema.SweepConfig`` validation + ``data.sweep.run_sweep`` on

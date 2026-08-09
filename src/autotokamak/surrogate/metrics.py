@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Error metrics for ψ(R,Z) predictions.
 
 All metrics operate on full-grid arrays of shape ``(N, nz, nr)`` after any

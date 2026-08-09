@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Library-level Phase-1 dataset sweep.
 
 Extracts the deterministic loop from the agent-authored runner at

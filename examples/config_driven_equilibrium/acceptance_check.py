@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# provenance: URSA-generated (URSA plan->execute agent)
 """Lightweight acceptance/regression checks for OFT config-driven equilibrium.
 
 Usage:

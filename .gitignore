@@ -67,3 +67,7 @@ notebooks/manual_surrogate_run/
 notebooks/scaling_runs/
 .claude/scheduled_tasks.lock
 .claude/settings.local.json
+
+# Single-prompt capability-test workspaces (generated at run time)
+just_ursa/workspace/
+just_dspy/workspace/

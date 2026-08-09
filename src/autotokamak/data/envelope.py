@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Target-envelope evaluation set: frozen, full-envelope, per-region.
 
 Active learning breaks the "carve a test shard from the seed dataset" logic:

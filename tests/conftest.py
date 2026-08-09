@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Shared test fixtures/helpers for the autotokamak suite."""
 
 from __future__ import annotations

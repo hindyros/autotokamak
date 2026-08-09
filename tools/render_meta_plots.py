@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Render meta-loop visualizations from a workspace's meta_trace.json + report.json.
 
 Writes into ``<workspace>/outputs/meta_plots/``:

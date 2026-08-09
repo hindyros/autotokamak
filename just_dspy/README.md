@@ -5,7 +5,7 @@
 Third arm of the experiment started in [just_ursa/](../just_ursa/README.md):
 given the **same single task prompt** — build a Grad–Shafranov ψ(R,Z)
 surrogate from scratch, with an adaptive-sampling data campaign under a
-400-solve budget and honest held-out evaluation — can a **DSPy-native agent**
+campaign structure (up to 10 adaptive rounds x 500 solves, 70% error-reduction early stop) and honest held-out evaluation — can a **DSPy-native agent**
 generate the full codebase and actually run it to produce the outputs?
 
 | Condition | Substrate | Harness |
@@ -42,7 +42,7 @@ Because the program is signatures + modules, it is **GEPA-optimizable later**
 [task.yaml](task.yaml)'s `problem:` is byte-identical to
 `just_ursa/task.yaml` except the URSA-runtime bullet
 (`graph_store.sqlite`/`ursa_metrics`) is dropped — this harness writes
-nothing into the workspace. Same parameter box, same 400-solve budget, same
+nothing into the workspace. Same parameter box, same campaign structure, same
 evaluation grid/metric, same `predict.py` + `report.json` contract, same
 `autotokamak`-forbidden rule, same optional OFT source symlink.
 

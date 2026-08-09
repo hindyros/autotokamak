@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Optuna study harness — the inner loop of Architecture C.
 
 The OUTER loop is the LLM agent: it emits a ``SearchSpec`` per round

@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# provenance: URSA-generated (URSA plan->execute agent)
 """Outer loop: tune selected YAML parameters so TokaMaker ψ matches a target.
 
 Target modes:

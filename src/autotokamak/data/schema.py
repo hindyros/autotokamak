@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Pydantic schemas for the Phase-1 dataset sweep, used as a library.
 
 These mirror the YAML the Phase-1 agent emits in

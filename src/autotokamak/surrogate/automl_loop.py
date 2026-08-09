@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Deterministic Phase-2 AutoML outer loop with typed per-round decisions.
 
 This is the structured replacement for the codegen path (an URSA agent

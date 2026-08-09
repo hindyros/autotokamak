@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Warn-only environment probe for the autotokamak Skill.
 
 Reports Python version, repo location, OFT availability, and autotokamak

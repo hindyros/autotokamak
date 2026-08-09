@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Render experiments/*/trace.json into a browsable static HTML report.
 
 Usage:
@@ -43,9 +44,12 @@ def _parse_utc(s: str) -> Optional[_dt.datetime]:
     if not s:
         return None
     try:
-        return _dt.datetime.fromisoformat(s.replace("Z", "+00:00"))
+        dt = _dt.datetime.fromisoformat(s.replace("Z", "+00:00"))
     except ValueError:
         return None
+    if dt.tzinfo is None:  # naive stamps (e.g. "20260719_182653") are UTC
+        dt = dt.replace(tzinfo=_dt.timezone.utc)
+    return dt
 
 
 def _index_logs(logs_dir: Path) -> list[LogFile]:
@@ -1093,6 +1097,11 @@ def _render_compute_cost(trace: dict, workspace: Path | None) -> str:
     """Wall-clock, trial count, iteration count, sub-run count."""
     started, finished = trace.get("started_utc"), trace.get("finished_utc")
     wall = _fmt_duration(started or "", finished or "") if started and finished else "—"
+    if wall == "—" and trace.get("steps"):
+        # just_dspy traces: no finished_utc, but per-step timings exist.
+        total_s = sum(float(s.get("seconds") or 0.0) for s in trace["steps"] if isinstance(s, dict))
+        if total_s:
+            wall = f"{total_s/3600:.1f} h (agent step time)"
     iter_root = (workspace / "iterations") if workspace else None
     n_iters = len(list(iter_root.iterdir())) if iter_root and iter_root.is_dir() else 0
     sur_root = (workspace / "surrogate_runs") if workspace else None
@@ -1288,9 +1297,105 @@ def _render_round(rnd: dict, log_slices: dict[int, str] | None = None) -> str:
     )
 
 
+def _render_capability_report(workspace: Path | None, trace: dict | None = None) -> str:
+    """Summary card for a capability-test run's workspace/report.json
+    (just_ursa / just_dspy schema: solve counts + rel-L2 metrics)."""
+    if workspace is None:
+        return ""
+    rpt_path = workspace / "report.json"
+    rpt = _load_json(rpt_path)
+    if not rpt or "n_solves_attempted" not in rpt:
+        return ""
+    # Workspaces are reused across rounds: only show the report if it was
+    # written during THIS run's window, else we'd attribute a later round's
+    # results to an earlier trace.
+    started = _parse_utc((trace or {}).get("started_utc", "") or "")
+    if started is not None:
+        mtime = _dt.datetime.fromtimestamp(rpt_path.stat().st_mtime, tz=_dt.timezone.utc)
+        finished = _parse_utc((trace or {}).get("finished_utc", "") or "")
+        window_end = (finished or mtime) + _dt.timedelta(minutes=5)
+        if not (started <= mtime <= window_end):
+            return ""
+    rows = [
+        f'<div><b>Solves:</b> {rpt.get("n_solves_succeeded", "?")} succeeded / '
+        f'{rpt.get("n_solves_attempted", "?")} attempted</div>',
+        f'<div><b>Train / test samples:</b> {rpt.get("n_train", "?")} / {rpt.get("n_test", "?")}</div>',
+    ]
+    metrics = rpt.get("metrics") or {}
+    model_m = (metrics.get("test_rel_l2") or {}).get("mean")
+    base_m = (metrics.get("baseline_rel_l2") or {}).get("mean")
+    if isinstance(model_m, (int, float)) and isinstance(base_m, (int, float)) and base_m:
+        reduction = 100.0 * (1.0 - model_m / base_m)
+        rows.append(
+            f'<div><b>Test rel-L2:</b> {model_m:.4f} vs baseline {base_m:.4f} '
+            f'→ <b>{reduction:.1f}% error reduction</b></div>'
+        )
+    strat = rpt.get("sampling_strategy")
+    if strat:
+        rows.append(f'<div><b>Sampling:</b> {html.escape(str(strat)[:300])}</div>')
+    return f'<h2>Campaign report</h2><div class="card">{"".join(rows)}</div>'
+
+
+def _render_dspy_run(t: dict) -> str:
+    """Render a just_dspy trace (plan/steps/reviews schema, no URSA rounds)."""
+    parts: list[str] = []
+    plan = t.get("plan") or []
+    if plan:
+        items = "".join(f"<li>{html.escape(str(p))}</li>" for p in plan)
+        parts.append(f"<h2>Plan ({len(plan)} steps)</h2><ol>{items}</ol>")
+    steps = t.get("steps") or []
+    if steps:
+        rows = []
+        total_s = 0.0
+        for s in steps:
+            ok = s.get("ok")
+            mark, color = ("✓", "#28a745") if ok else ("✗", "#d73a49")
+            secs = float(s.get("seconds") or 0.0)
+            total_s += secs
+            step_text = html.escape(str(s.get("step", "")))
+            summary = html.escape(str(s.get("summary", "")))
+            rows.append(
+                f'<details><summary><span style="color:{color}">{mark}</span> '
+                f'<b>Step {s.get("index", "?")}</b> '
+                f'<span class="muted">({secs:.0f}s)</span> '
+                f'{step_text[:120]}…</summary>'
+                f'<p class="muted"><b>Task:</b> {step_text}</p>'
+                f'<p><b>Agent summary:</b> {summary}</p></details>'
+            )
+        parts.append(
+            f"<h2>Execution ({len(steps)} steps, {total_s/60:.0f} min agent time, "
+            f"{t.get('n_tool_calls', '?')} tool calls)</h2>" + "".join(rows)
+        )
+    reviews = t.get("reviews") or []
+    if reviews:
+        rows = []
+        for r in reviews:
+            complete = r.get("complete")
+            mark, color = ("✓ complete", "#28a745") if complete else ("✗ incomplete", "#d73a49")
+            missing = r.get("missing") or []
+            missing_html = (
+                "<ul>" + "".join(f"<li>{html.escape(str(m))}</li>" for m in missing) + "</ul>"
+                if missing else ""
+            )
+            rows.append(
+                f'<div class="card"><b>Review round {r.get("round", "?")}:</b> '
+                f'<span style="color:{color}">{mark}</span>{missing_html}</div>'
+            )
+        parts.append(f"<h2>Deliverable reviews</h2>" + "".join(rows))
+    return "".join(parts)
+
+
 def _write_detail(run: dict, out_dir: Path, all_runs: list[dict] | None = None) -> None:
     t = run["trace"]
     prompt = t.get("prompt") or {}
+    if not prompt and t.get("runner") == "just_dspy":
+        # just_dspy traces carry these fields at top level, not under prompt.
+        prompt = {
+            "model": t.get("model", ""),
+            "path": t.get("config", ""),
+            "workspace": t.get("workspace", ""),
+            "feedback_rounds": t.get("fix_rounds", "?"),
+        }
     run_id = run["run_id"]
     log_link = ""
     if run["log_path"]:
@@ -1313,6 +1418,7 @@ def _write_detail(run: dict, out_dir: Path, all_runs: list[dict] | None = None) 
     score_html = _render_score(t.get("score") or {})
     workspace_path = Path(prompt.get("workspace")) if prompt.get("workspace") else None
     _ensure_plots(workspace_path)
+    capability_html = _render_capability_report(workspace_path, t)
     meta_report_html = _render_meta_report(workspace_path)
     meta_table_html = _render_meta_iteration_table(workspace_path)
     meta_plots_html = _render_meta_plots(workspace_path, out_dir)
@@ -1333,6 +1439,8 @@ def _write_detail(run: dict, out_dir: Path, all_runs: list[dict] | None = None) 
     rounds_html = "".join(
         _render_round(r, log_by_round.get(r.get("round"), {})) for r in t.get("rounds") or []
     )
+    if t.get("runner") == "just_dspy":
+        rounds_html = _render_dspy_run(t) + rounds_html
     art = t.get("artifacts") or {}
     files = art.get("files_written") or []
     files_html = ""
@@ -1361,6 +1469,7 @@ def _write_detail(run: dict, out_dir: Path, all_runs: list[dict] | None = None) 
         header
         + score_html
         # ── Results ──
+        + capability_html
         + meta_report_html
         + meta_table_html
         + meta_plots_html

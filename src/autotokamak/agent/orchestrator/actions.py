@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Action dispatchers invoked by the meta-loop runner.
 
 Three actions, three dispatchers. Each takes ``(payload, state)`` and

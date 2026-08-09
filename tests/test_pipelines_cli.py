@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Smoke tests for the unified pipelines CLI.
 
 Tests run in-process with mocked platform calls so they are fast and offline.

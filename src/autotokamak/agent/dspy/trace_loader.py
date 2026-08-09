@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Convert recorded meta-agent traces into a DSPy trainset.
 
 Each meta-loop run writes two JSON files:

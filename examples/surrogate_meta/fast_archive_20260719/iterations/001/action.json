@@ -1,0 +1,14 @@
+{
+  "action": "enrich_active",
+  "regen": null,
+  "enrich": {
+    "n_new": 300,
+    "strategy": "residual_ucb",
+    "beta": 0.6,
+    "feasibility_weighting": true,
+    "rationale": "Residual-driven active learning will place new solves where the current winner demonstrably underperforms along the correlated inputs, yielding more RMSE reduction per added sample than blind sampling."
+  },
+  "extend": null,
+  "terminate": null,
+  "diagnosis": "The surrogate is sample-bottlenecked with structured, input-correlated residuals (r0/a/kappa/delta/Ip), so current errors are dominated by under-sampled/weak regions rather than split noise or pure hyperparameter tuning."
+}

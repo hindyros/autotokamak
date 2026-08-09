@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Dispatch a named prompt to the correct URSA runner.
 
 Only 5 canonical prompt names are accepted — keeps stdout contract stable

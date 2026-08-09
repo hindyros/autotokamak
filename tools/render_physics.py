@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Render tokamak physics visualizations from a dataset.h5.
 
 Usage:

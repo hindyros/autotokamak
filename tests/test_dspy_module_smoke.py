@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Smoke tests for MetaActionPickerModule.
 
 Uses dspy's DummyLM to avoid any real LM call. Verifies the ActionDecision

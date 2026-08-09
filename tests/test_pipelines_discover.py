@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Regression tests for autotokamak.pipelines.discover.
 
 These lock the behavior that broke the HTML report's plots: the meta-loop

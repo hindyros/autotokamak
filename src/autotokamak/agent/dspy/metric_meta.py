@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Composite scorer for the meta-agent loop.
 
 Mirrors ``metric_surrogate.score_surrogate_run`` shape (same ``ScoreReport``

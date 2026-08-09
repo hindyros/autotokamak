@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Tests for ``autotokamak.data.h5io`` — read/write/merge/split helpers."""
 
 from __future__ import annotations

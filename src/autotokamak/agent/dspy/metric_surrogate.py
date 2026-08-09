@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Composite scorer for Phase-2 surrogate AutoML runs.
 
 Mirrors the shape of ``metric.score_run`` (same ``ScoreReport`` dataclass,

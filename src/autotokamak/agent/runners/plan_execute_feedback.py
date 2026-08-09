@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Plan–execute runner with a global feedback loop.
 
 Same interface as agent.plan_execute, but after the first plan+execute cycle the planner
