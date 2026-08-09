@@ -135,7 +135,7 @@ def test_phase2_pipeline_against_real_dataset(tmp_path: Path):
 
     sys.path.insert(0, str(REPO_ROOT / "src" / "autotokamak"))
     try:
-        from autotokamak.agent.runners.scoring import try_score
+        from autotokamak.bench.scoring import try_score
     finally:
         sys.path.pop(0)
 
@@ -153,7 +153,7 @@ def test_try_score_handles_missing_scorer_gracefully(tmp_path: Path):
 
     sys.path.insert(0, str(REPO_ROOT / "src" / "autotokamak"))
     try:
-        from autotokamak.agent.runners.scoring import try_score
+        from autotokamak.bench.scoring import try_score
     finally:
         sys.path.pop(0)
 

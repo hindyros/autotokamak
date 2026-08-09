@@ -5,7 +5,7 @@ For the version with re-planning after execution, see
 ``agent.runners.plan_execute_feedback``.
 
 Each invocation writes ``experiments/<run_id>/trace.json`` (unless
-``--no-trace``); shape defined in ``agent.runners.trace``.
+``--no-trace``); shape defined in ``bench.trace``.
 """
 import argparse
 import sys
@@ -19,8 +19,8 @@ from autotokamak.agent.runners.config import (
     materialize_symlinks,
     resolve_workspace,
 )
-from autotokamak.agent.runners.scoring import try_score
-from autotokamak.agent.runners.trace import RunTrace
+from autotokamak.bench.scoring import try_score
+from autotokamak.bench.trace import RunTrace
 
 load_dotenv(REPO_ROOT / ".env")
 

@@ -42,7 +42,7 @@ from autotokamak.surrogate.metrics import (
 )
 
 from autotokamak.agent.runners.config import REPO_ROOT, resolve_workspace
-from autotokamak.agent.runners.trace import RunTrace
+from autotokamak.bench.trace import RunTrace
 
 load_dotenv(REPO_ROOT / ".env")
 

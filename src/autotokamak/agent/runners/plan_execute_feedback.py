@@ -17,7 +17,7 @@ Config (YAML) may include:
 
 Each invocation also writes a structured trace to ``experiments/<run_id>/trace.json``
 (unless ``--no-trace`` is given). The trace shape is defined in
-``agent.runners.trace`` and is the substrate for the DSPy integration plan
+``bench.trace`` and is the substrate for the DSPy integration plan
 (see ``docs/dspy_integration_plan.md``).
 """
 
@@ -32,8 +32,8 @@ from autotokamak.agent.runners.config import (
     materialize_symlinks,
     resolve_workspace,
 )
-from autotokamak.agent.runners.scoring import try_score
-from autotokamak.agent.runners.trace import RunTrace
+from autotokamak.bench.scoring import try_score
+from autotokamak.bench.trace import RunTrace
 
 load_dotenv(REPO_ROOT / ".env")
 
