@@ -186,6 +186,45 @@ class RunTrace:
         trace.save()
         return trace
 
+    @classmethod
+    def open_at(
+        cls,
+        run_dir: Path,
+        *,
+        prompt_path: Path,
+        model: str,
+        workspace: str,
+        harness: str | None = None,
+        run_id: str | None = None,
+        feedback_rounds: int = 1,
+    ) -> "RunTrace":
+        """Like ``open`` but writes ``trace.json`` directly into ``run_dir``.
+
+        Used by the bench harnesses, which own their run-dir layout
+        (``experiments/<tag>/<condition>/<run_id>/``). The ``harness`` name is
+        an additive prompt-block field — schema stays v1 so existing trace
+        consumers (DSPy loader, GEPA corpora) keep working.
+        """
+        run_dir = Path(run_dir)
+        run_dir.mkdir(parents=True, exist_ok=True)
+        prompt: dict[str, Any] = {
+            "path": str(prompt_path),
+            "sha256": _sha256_file(prompt_path),
+            "model": model,
+            "feedback_rounds": int(feedback_rounds),
+            "workspace": str(workspace),
+        }
+        if harness is not None:
+            prompt["harness"] = harness
+        trace = cls(
+            run_id=run_id or utc_run_id(),
+            started_utc=_now_iso(),
+            prompt=prompt,
+        )
+        trace._path = run_dir / TRACE_FILENAME
+        trace.save()
+        return trace
+
     # ---- recording methods ------------------------------------------
 
     def start_round(self, round_no: int) -> RoundRecord:
