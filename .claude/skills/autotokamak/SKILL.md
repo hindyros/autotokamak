@@ -79,6 +79,7 @@ Full protocol: `references/repo-locate.md`. Every wrapper in `scripts/` performs
 | Invoke `plan_execute_feedback` or `meta_loop` | `references/agent-runners.md` + `scripts/run_agent.py --prompt NAME` |
 | Debug isoflux fallback, bad q95, mesh error | `references/debugging.md` |
 | Train / evaluate a surrogate | `references/surrogates.md` + `scripts/eval_surrogate.py` |
+| Benchmark an agent harness (L2/L3 codegen conditions) | `benchmarks/README.md` + `scripts/run_benchmark.py --task PATH --harness NAME` |
 | Generate a rich HTML report for a run | `scripts/report.py --run-id ID` (or `--latest`) |
 | Add a new example workspace under `examples/` | `references/examples-guide.md` + `assets/templates/example_workspace/` |
 | Physics background | `references/physics.md` |
@@ -145,7 +146,8 @@ Full primer: `references/physics.md`.
 - `run_agent.py --prompt NAME` — dispatch a named prompt to `plan_execute_feedback` (or `meta_loop` for `surrogate_meta`)
 - `probe_feasible.py` — LHS feasibility scan for shaping bounds
 - `eval_surrogate.py` — 7 diagnostic PNGs + JSON metrics
-- `run_full_pipeline.py` — Phase-1 → Phase-2 → eval → HTML report
+- `run_full_pipeline.py` — Phase-1 → Phase-2 → eval → HTML report (chains `python -m autotokamak.pipelines`, `--level L0|L1`)
+- `run_benchmark.py` — one cell of the harness × access-level benchmark matrix via `python -m autotokamak.bench run` (see `benchmarks/README.md`)
 - `trace_to_html.py` — render `experiments/*/trace.json` to browsable HTML (light theme, run index)
 - `report.py` — self-contained dark-mode HTML report for one run: physics & dataset (swept/fixed tokamak params, sampling method, ψ grid) + score gates + quality bars + winner rationale (agent's own words from the terminating round) + model comparison + collapsible per-round search decisions (action, agent rationale, models & search space tried) + Optuna SVG + eval gallery + round-by-round agent reasoning + meta iterations. Base64-embedded images, no external assets.
 - `check_env.py` — Python/OFT/repo probe, warn-only

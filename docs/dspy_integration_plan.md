@@ -2,6 +2,8 @@
 
 Status: **implemented** (the meta-action-picker GEPA optimization of §7 and the Phase-2 search-picker are both shipped; see §7 and §10). This document is retained as the design rationale. Last updated 2026-07-18.
 
+> Note (2026-08): historical paths below have moved in the repo cleanup — `agent/runners/trace.py` is now `src/autotokamak/bench/trace.py`, `just_dspy/` became the `dspy` harness at `src/autotokamak/harnesses/dspy_harness.py`, and the DSPy pickers are the L1 substrate of the harness × access-level matrix; see `benchmarks/README.md`.
+
 This document records why we are (or aren't) pulling DSPy into the agent stack, what we'd actually do with it given the state of the repo today, and the ordering of work.
 
 For project context see [`project_agenda.md`](project_agenda.md). For repo mechanics see [`../CLAUDE.md`](../CLAUDE.md).

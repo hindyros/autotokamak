@@ -8,9 +8,12 @@ Built as a summer RA project at **MIT Energy Initiative**.
 
 The platform runs as three phases behind one CLI: **Phase-1** generates a Grad–Shafranov
 parameter-sweep dataset, **Phase-2** runs surrogate AutoML over that dataset, and the
-**meta-loop** chains the two into a self-improving outer loop. Each phase runs in either
-`fast` mode (in-process library code) or `ursa` mode (a URSA agent writes and runs the
-code). See [Running the platform](#running-the-platform) below.
+**meta-loop** chains the two into a self-improving outer loop. The pre-written pipeline
+runs at access level `L0` (scripted heuristic decisions, no LLM) or `L1` (LLM-typed
+decisions via DSPy pickers); agent-*written* pipeline code (levels `L2`/`L3`, on any
+agent harness) is benchmarked separately via `python -m autotokamak.bench` — see
+[benchmarks/README.md](benchmarks/README.md). See
+[Running the platform](#running-the-platform) below.
 
 ---
 
@@ -20,6 +23,7 @@ code). See [Running the platform](#running-the-platform) below.
 - [docs/agent-workflows.md](docs/agent-workflows.md) — how runners and prompts work.
 - [docs/examples.md](docs/examples.md) — how to run and interpret example workspaces.
 - [docs/configs.md](docs/configs.md) — agent task YAML vs simulation config YAML.
+- [benchmarks/README.md](benchmarks/README.md) — the agent-capability experiment matrix (harness × access level L0–L3).
 - [docs/glossary.md](docs/glossary.md) — beginner-friendly definitions of core terms.
 
 ---
@@ -76,37 +80,57 @@ python run_fixed_boundary_equilibrium.py --case analytic
 The primary entry point is the unified pipelines CLI:
 
 ```bash
-python -m autotokamak.pipelines <phase1|phase2|meta> --mode <fast|ursa> [opts]
+python -m autotokamak.pipelines <phase1|phase2|meta> [--level L0|L1] [opts]
 ```
 
-| Command | Mode | What it does |
+| Command | Decisions | What it does |
 |---|---|---|
-| `pipelines phase1 --mode fast` | library | `run_sweep` directly → `examples/dataset_generation/fast/` |
-| `pipelines phase1 --mode ursa` | URSA codegen | agent writes `run_dataset_sweep.py` → `examples/dataset_generation/ursa/` |
-| `pipelines phase2 --mode fast` | library | `automl_loop` (Optuna + DSPy) → `examples/surrogate_automl/fast/` |
-| `pipelines phase2 --mode ursa` | URSA codegen | agent writes `run_surrogate_automl.py` → `examples/surrogate_automl/ursa/` |
-| `pipelines meta --mode fast` | library | full self-improving meta-loop → `examples/surrogate_meta/fast/` |
-| `pipelines meta --mode ursa` | hybrid | meta-loop with URSA codegen for nested Phase-2 → `examples/surrogate_meta/ursa/` |
+| `pipelines phase1` | none (always L0) | `run_sweep` directly → `examples/dataset_generation/L0/` |
+| `pipelines phase2 --level L0` | scripted heuristics | `automl_loop` (Optuna) → `examples/surrogate_automl/L0/` |
+| `pipelines phase2 --level L1` | DSPy LLM-typed | same pipeline, LLM picks each search round → `examples/surrogate_automl/L1/` |
+| `pipelines meta --level L0` | scripted heuristics | full self-improving meta-loop → `examples/surrogate_meta/L0/` |
+| `pipelines meta --level L1` | DSPy LLM-typed | meta-loop with LLM action/search pickers → `examples/surrogate_meta/L1/` |
 
-Each run writes `examples/<workspace>/<mode>/manifest.json` (run_id, key paths, score).
+Each run writes `examples/<workspace>/<level>/manifest.json` (run_id, key paths, score,
+and the run's `condition`: `L0-none` or `L1-dspy`).
 
 Examples:
 
 ```bash
 # Phase-1: generate a 500-sample dataset
-python -m autotokamak.pipelines phase1 --mode fast --n-samples 500
+python -m autotokamak.pipelines phase1 --n-samples 500
 
 # Phase-2: 10-minute AutoML search over the latest dataset
-python -m autotokamak.pipelines phase2 --mode fast --time-budget 600
+python -m autotokamak.pipelines phase2 --level L0 --time-budget 600
 
 # Meta-loop: run until the surrogate is 90% better than the mean-predictor baseline
-python -m autotokamak.pipelines meta --mode fast --target-accuracy-pct 90 --max-iterations 5
+python -m autotokamak.pipelines meta --level L0 --target-accuracy-pct 90 --max-iterations 5
 ```
+
+### Benchmarking agent-written pipelines (L2/L3)
+
+Conditions where a coding agent *writes* the pipeline code run through the bench CLI —
+one cell of the harness × access-level matrix per run
+(see [benchmarks/README.md](benchmarks/README.md)):
+
+```bash
+# cheap smoke first (auth, jailing, trace capture):
+python -m autotokamak.bench run --task benchmarks/tasks/smoke.yaml --harness echo
+
+# a real condition: L3 from-scratch on the Claude Agent SDK harness
+python -m autotokamak.bench run --task benchmarks/tasks/L3_from_scratch.yaml \
+    --harness claude_sdk --tag aug09
+
+# compare every run under a tag
+python -m autotokamak.bench compare --tag aug09
+```
+
+Runs land in `experiments/<tag>/<condition>/<run_id>/{workspace/, trace.json, result.json}`.
 
 ### Lower-level agent runners
 
-The pipelines CLI dispatches to URSA runners under `src/autotokamak/agent/`. You can also
-invoke these directly:
+`pipelines meta` dispatches to `meta_loop.py` under `src/autotokamak/agent/`; the URSA
+plan/execute runners back the `ursa` benchmark harness. You can also invoke these directly:
 
 - **`agent/runners/plan_execute.py`** — plan → execute loop using URSA's PlanningAgent + ExecutionAgent.
 - **`agent/runners/plan_execute_feedback.py`** — same, with a re-planning feedback loop after failures.
@@ -122,7 +146,7 @@ python -m autotokamak.agent.runners.plan_execute \
 
 ```mermaid
 flowchart TD
-    CLI[Primary entry point<br/>python -m autotokamak.pipelines phase1 pipe phase2 pipe meta --mode fast pipe ursa]
+    CLI[Primary entry point<br/>python -m autotokamak.pipelines phase1 pipe phase2 pipe meta --level L0 pipe L1]
 
     subgraph P1 [Phase-1: dataset generation]
       SW[data/sweep.py run_sweep<br/>+ optional active learning data/acquire.py, data/envelope.py]
@@ -139,7 +163,7 @@ flowchart TD
     end
 
     CORE[autotokamak.core + OFT TokaMaker<br/>geometry / solver / diagnostics]
-    OUT[examples/&lt;workspace&gt;/&lt;mode&gt;/<br/>manifest.json, artifacts, report]
+    OUT[examples/&lt;workspace&gt;/&lt;level&gt;/<br/>manifest.json, artifacts, report]
 
     CLI --> P1
     CLI --> P2
@@ -153,9 +177,9 @@ flowchart TD
     WIN --> OUT
     ML --> OUT
 
-    URSA[ursa mode<br/>URSA PlanningAgent + ExecutionAgent<br/>write + run generated scripts]
-    CLI -.->|--mode ursa| URSA
-    URSA --> OUT
+    BENCH[bench CLI L2/L3<br/>python -m autotokamak.bench run<br/>harness writes + runs the code]
+    BENCHOUT[experiments/&lt;tag&gt;/&lt;condition&gt;/&lt;run_id&gt;/<br/>workspace, trace.json, result.json]
+    BENCH --> BENCHOUT
 ```
 
 ---

@@ -1299,7 +1299,8 @@ def _render_round(rnd: dict, log_slices: dict[int, str] | None = None) -> str:
 
 def _render_capability_report(workspace: Path | None, trace: dict | None = None) -> str:
     """Summary card for a capability-test run's workspace/report.json
-    (just_ursa / just_dspy schema: solve counts + rel-L2 metrics)."""
+    (legacy just_ursa / just_dspy schema: solve counts + rel-L2 metrics;
+    those runs are archived under benchmarks/reference_runs/L3-{ursa,dspy}/)."""
     if workspace is None:
         return ""
     rpt_path = workspace / "report.json"
@@ -1337,7 +1338,9 @@ def _render_capability_report(workspace: Path | None, trace: dict | None = None)
 
 
 def _render_dspy_run(t: dict) -> str:
-    """Render a just_dspy trace (plan/steps/reviews schema, no URSA rounds)."""
+    """Render a legacy just_dspy trace (plan/steps/reviews schema, no URSA
+    rounds). The just_dspy runner is now src/autotokamak/harnesses/dspy_harness.py,
+    but old traces with runner=="just_dspy" remain in experiments/."""
     parts: list[str] = []
     plan = t.get("plan") or []
     if plan:

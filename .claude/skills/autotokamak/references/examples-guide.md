@@ -29,7 +29,7 @@ Use `examples/config_driven_equilibrium/` as the reference. Its `run_equilibrium
 4. `setup_and_solve(cfg, mesh_pts, mesh_lc, mesh_reg, lcfs)` → wraps `autotokamak.core.solver.solve_equilibrium`.
 5. `save_case_outputs(cfg, gs_mesh, gs, ...)` → writes `summary.json`, `summary.yaml`, `raw_arrays.npz`, `mesh_*.png`, `psi_*.png`, `config_used.yaml` under `outputs/<case_slug>_<hash>/`.
 
-The runner deliberately does NOT import from `autotokamak.eval.*` or `autotokamak.surrogate.*` — those are Phase-2+ concerns.
+The runner deliberately does NOT import from `autotokamak.surrogate.*` — those are Phase-2+ concerns.
 
 ## Shipped examples
 

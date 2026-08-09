@@ -2,6 +2,8 @@
 
 Status: living document. Last updated 2026-06-15 (agenda text); see the shipped-status note below.
 
+> Note (2026-08): the pipelines CLI described below dropped `--mode fast|ursa` in the repo cleanup — it is now `python -m autotokamak.pipelines <phase1|phase2|meta> [--level L0|L1]`, and agent-codegen conditions (L2/L3) run via `python -m autotokamak.bench run`; see `benchmarks/README.md`. Command syntax in this document is historical.
+
 This file records what we're trying to build, why, and which decisions are still pending. Read this before adding new prompts, agents, or surrogate-model code — it pins down scope so the repo doesn't drift.
 
 For repo structure, setup, and code conventions, see [`CLAUDE.md`](../CLAUDE.md). This file is the *intent*; CLAUDE.md is the *mechanics*.

@@ -33,12 +33,14 @@ from _locate import (  # type: ignore[import-not-found]
 
 
 PROMPT_TO_RUNNER = {
-    "dataset_generation":         "agent.runners.plan_execute_feedback",
-    "oft_discretization_example": "agent.runners.plan_execute_feedback",
-    "oft_example_generation":     "agent.runners.plan_execute",
-    "surrogate_automl":           "agent.runners.plan_execute_feedback",
-    "surrogate_meta":             "agent.runners.meta_loop",
+    "dataset_generation":         "autotokamak.agent.runners.plan_execute_feedback",
+    "oft_discretization_example": "autotokamak.agent.runners.plan_execute_feedback",
+    "oft_example_generation":     "autotokamak.agent.runners.plan_execute",
+    "surrogate_automl":           "autotokamak.agent.runners.plan_execute_feedback",
+    "surrogate_meta":             "autotokamak.agent.runners.meta_loop",
 }
+
+META_RUNNER = "autotokamak.agent.runners.meta_loop"
 
 PROMPTS_REL = "src/autotokamak/agent/prompts"
 
@@ -74,11 +76,11 @@ def main() -> None:
     cmd = [py, "-u", "-m", runner_module, "--config", str(prompt_path.relative_to(root))]
     if args.model:
         cmd += ["--model", args.model]
-    if args.workspace and runner_module != "agent.runners.meta_loop":
+    if args.workspace and runner_module != META_RUNNER:
         cmd += ["--workspace", args.workspace]
     if args.no_trace:
         cmd.append("--no-trace")
-    if runner_module == "agent.runners.meta_loop":
+    if runner_module == META_RUNNER:
         if args.max_iterations is not None:
             cmd += ["--max-iterations", str(args.max_iterations)]
         if args.n_samples is not None:

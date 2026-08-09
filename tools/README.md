@@ -4,8 +4,12 @@ Standalone scripts that read the artifacts a pipeline run leaves behind.
 None of them are needed to *run* the pipelines — the front door for that is:
 
 ```bash
-python -m autotokamak.pipelines <phase1|phase2|meta> --mode <fast|ursa>
+python -m autotokamak.pipelines <phase1|phase2|meta> [--level L0|L1]
 ```
+
+(Agent-codegen benchmark conditions run via
+`python -m autotokamak.bench run --task benchmarks/tasks/<task>.yaml --harness <name>`;
+see `benchmarks/README.md`.)
 
 | Script | What it does |
 |---|---|

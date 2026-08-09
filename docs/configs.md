@@ -50,7 +50,7 @@ action builds programmatically. Blocks:
 - `output_grid` (`OutputGrid`) — `R` and `Z` axes, each `{min, max, n}`.
 - `output_path` — default `dataset.h5`.
 
-Run with `python -m autotokamak.pipelines phase1 --mode fast --config <config>.yaml`.
+Run with `python -m autotokamak.pipelines phase1 --config <config>.yaml`.
 
 ## 4) Phase-2 Surrogate Configs — `SurrogateConfig`
 
@@ -63,7 +63,7 @@ agent does **not** iterate on per round (per-round search decisions live in
 - `n_pca_components_default` — default PCA rank (1–64, default 12).
 - `seed`, `k_folds` (2–8, default 4), `test_frac` (default 2/16), `output_dir` (default `outputs`).
 
-Run with `python -m autotokamak.pipelines phase2 --mode fast --dataset <dataset>.h5`.
+Run with `python -m autotokamak.pipelines phase2 [--level L0|L1] --dataset <dataset>.h5`.
 
 ## 5) Meta-loop Configs — `MetaConfig` / `EnvelopeConfig`
 

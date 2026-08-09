@@ -7,11 +7,12 @@ TokaMaker simulations.
 It is organized into these layers:
 
 1. **`autotokamak.core`** — shared library of geometry, solver, I/O, and schema utilities used by every higher layer.
-2. **`autotokamak.pipelines`** — the unified `phase1 | phase2 | meta` CLI (`--mode fast|ursa`); the primary entry point that orchestrates everything below. Also home of `discover.py`, which locates a run's artifacts for the `tools/` scripts.
+2. **`autotokamak.pipelines`** — the unified `phase1 | phase2 | meta` CLI (`--level L0|L1`); the primary entry point that orchestrates everything below. Also home of `discover.py`, which locates a run's artifacts for the `tools/` scripts.
 3. **Data layer** (`autotokamak.data`) — parameter-sweep dataset generation, HDF5 I/O, and active-learning acquisition + envelope evaluation.
 4. **Surrogate layer** (`autotokamak.surrogate`) — everything surrogate training: dataset loading/splitting (`dataset`), PCA reduction (`reduce`), metrics, the sklearn model zoo (`zoo`), the Optuna inner loop (`optuna_search`), the LLM-driven outer search loop (`automl_loop`), and run diagnostics for the meta-agent (`diagnostics`).
-5. **Agent orchestration layer** (`src/autotokamak/agent/`) — URSA runners, the meta-loop, DSPy pickers, and the orchestrator.
-6. **Runnable simulation examples layer** (`examples/`) — hand-runnable OFT workflows and generated agent workspaces.
+5. **Agent orchestration layer** (`src/autotokamak/agent/`) — URSA runners, the meta-loop, DSPy pickers, and the orchestrator. Decision policies (L0 scripted heuristics vs L1 DSPy-typed pickers) live in `src/autotokamak/policies/`.
+6. **Benchmark layer** (`src/autotokamak/bench/` + `src/autotokamak/harnesses/` + `benchmarks/`) — the agent-capability experiment matrix: task specs, harness adapters (`echo`, `ursa`, `dspy`, `claude_sdk`, `pi`, `cursor`), the shared deliverable contract, trace emission, and run scoring. See `benchmarks/README.md`.
+7. **Runnable simulation examples layer** (`examples/`) — hand-runnable OFT workflows and generated agent workspaces.
 
 Two example workspaces carry easily-confused names: `examples/surrogate_automl/`
 is the **standalone Phase-2** AutoML workspace, while `examples/surrogate_meta/`
@@ -20,7 +21,7 @@ distinct pipelines, not two names for one thing.
 
 ## Layer Boundaries
 
-- `pipelines/` is the front door: each phase runs in `fast` mode (in-process library code) or `ursa` mode (a URSA agent writes and runs the code), and writes `examples/<workspace>/<mode>/manifest.json`.
+- `pipelines/` is the front door for the pre-written pipeline: each phase runs at access level `L0` (scripted heuristic decisions, zero LLM) or `L1` (LLM-typed decisions via the DSPy pickers), and writes `examples/<workspace>/<level>/manifest.json` (manifest records `level` and `condition`: `L0-none` / `L1-dspy`). Phase-1 has no decision points and is always L0. Agent-*written* pipeline code (levels L2/L3) runs via `python -m autotokamak.bench` instead.
 - `agent/prompts/` contains task YAML prompts for URSA-driven runs.
 - `agent/runners/` contains Python entrypoints: the URSA `plan_execute*` runners plus `meta_loop.py` (the autonomous Phase-1 → Phase-2 outer loop).
 - `agent/dspy/` and `agent/orchestrator/` provide the LLM decision surface (action/search pickers) and the meta-loop action/schema layer.
@@ -32,7 +33,7 @@ The agent layer can generate or update content in `examples/`, but the examples 
 
 ```mermaid
 flowchart TD
-  cli[autotokamak.pipelines CLI<br/>phase1 pipe phase2 pipe meta, --mode fast pipe ursa]
+  cli[autotokamak.pipelines CLI<br/>phase1 pipe phase2 pipe meta, --level L0 pipe L1]
 
   subgraph dataLayer [Data layer]
     sweep[data/sweep.py run_sweep]
@@ -51,7 +52,7 @@ flowchart TD
   end
 
   core[autotokamak.core + OFT TokaMaker]
-  examples[examples/&lt;workspace&gt;/&lt;mode&gt;/<br/>manifest.json + artifacts + report]
+  examples[examples/&lt;workspace&gt;/&lt;level&gt;/<br/>manifest.json + artifacts + report]
 
   cli --> sweep
   cli --> automl
@@ -70,10 +71,11 @@ flowchart TD
 
 ## Entry Points
 
-- **Primary — pipelines CLI:** `python -m autotokamak.pipelines <phase1|phase2|meta> --mode <fast|ursa>`
-  - Phase-1 dataset: `python -m autotokamak.pipelines phase1 --mode fast --n-samples 500`
-  - Phase-2 AutoML: `python -m autotokamak.pipelines phase2 --mode fast --time-budget 600`
-  - Meta-loop: `python -m autotokamak.pipelines meta --mode fast --target-accuracy-pct 90`
+- **Primary — pipelines CLI:** `python -m autotokamak.pipelines <phase1|phase2|meta> [--level L0|L1]`
+  - Phase-1 dataset: `python -m autotokamak.pipelines phase1 --n-samples 500`
+  - Phase-2 AutoML: `python -m autotokamak.pipelines phase2 --level L0 --time-budget 600`
+  - Meta-loop: `python -m autotokamak.pipelines meta --level L0 --target-accuracy-pct 90`
+- **Benchmark CLI (agent-written code, L2/L3):** `python -m autotokamak.bench run --task benchmarks/tasks/<task>.yaml --harness <name>` (also `validate`, `compare --tag`, `freeze-testset`) — runs land in `experiments/<tag>/<condition>/<run_id>/`.
 - Lower-level agent run: `python -m autotokamak.agent.runners.plan_execute --config src/autotokamak/agent/prompts/oft_example_generation.yaml`
 - Lower-level feedback run: `python -m autotokamak.agent.runners.plan_execute_feedback --config src/autotokamak/agent/prompts/oft_discretization_example.yaml`
 - Fixed-boundary example: `python examples/fixed_boundary/run_fixed_boundary_equilibrium.py --case analytic`

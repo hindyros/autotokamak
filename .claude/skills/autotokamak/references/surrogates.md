@@ -10,13 +10,13 @@ inputs (N, 5)                        outputs (N, 96, 64)
       │           dataset.h5                │
       └──────────────┬──────────────────────┘
                      │
-              autotokamak.eval.data.load_dataset
+              autotokamak.surrogate.dataset.load_dataset
                      │
-                     ├─→ k-fold splits (eval.data.kfold)
+                     ├─→ k-fold splits (surrogate.dataset.kfold)
                      │
                      ├─→ input featurization (currently just raw 5-vector)
                      │
-                     ├─→ output reduction: PCA (eval.reduce.fit_pca)
+                     ├─→ output reduction: PCA (surrogate.reduce.fit_pca)
                      │
                      ├─→ model zoo:
                      │       GP  |  kernel_ridge  |  poly_ridge  |  small MLP
@@ -51,15 +51,15 @@ Written by `run_dataset_sweep.py`. Keys inside the HDF5:
 
 ## Splits
 
-`autotokamak.eval.data.kfold(bundle, k=4, test_frac=..., seed=0)` — random split, no stratification. At small N (~16), split luck dominates variance — LOO CV is sometimes better; see `docs/search_space.md` §E.
+`autotokamak.surrogate.dataset.kfold(bundle, k=4, test_frac=..., seed=0)` — random split, no stratification. At small N (~16), split luck dominates variance — LOO CV is sometimes better; see `docs/search_space.md` §E.
 
 ## Reduction
 
-`autotokamak.eval.reduce.fit_pca(psi_train, n_components)` fits a PCA on the flattened, NaN-imputed `psi` array. Currently the only reduction supported. `n_components` is one of the AutoML search dimensions.
+`autotokamak.surrogate.reduce.fit_pca(psi_train, n_components)` fits a PCA on the flattened, NaN-imputed `psi` array. Currently the only reduction supported. `n_components` is one of the AutoML search dimensions.
 
 ## Metrics
 
-- **Inner objective:** `autotokamak.eval.metrics.psi_rmse(true, pred)` — full-grid RMSE in ψ units, averaged over folds.
+- **Inner objective:** `autotokamak.surrogate.metrics.psi_rmse(true, pred)` — full-grid RMSE in ψ units, averaged over folds.
 - **Baseline:** `baseline_mean_predictor_rmse(train_psi, val_psi)` — mean-of-training-ψ predictor. Any winner must beat this.
 
 ## Predict-with-winner
@@ -97,4 +97,4 @@ The Phase-3 outer loop lets the agent break out of Phase 2's fixed dataset. Each
 - `extend_search(focus)` — another Phase-2 with directives (e.g. "focus on MLP").
 - `terminate(reason)` — stop.
 
-Diagnosis is deterministic (`autotokamak.eval.diagnostics.run_all`); the action pick is LLM (DSPy-optimizable).
+Diagnosis is deterministic (`autotokamak.surrogate.diagnostics.run_all`); the action pick is LLM (DSPy-optimizable).
