@@ -118,6 +118,7 @@ def collect_meta_cells(workspaces: list[Path]) -> list[dict]:
         cells.append({
             "_kind": "meta",
             "_workspace": ws,
+            "_manifest": m,
             "condition": m.get("condition", ws.name),
             "run_id": m.get("run_id"),
             "status": "completed" if m.get("n_iterations") is not None else "unknown",
@@ -266,6 +267,150 @@ def condition_description(condition: str, harness) -> str:
     return LEVEL_DESCRIPTIONS.get(level, "").format(h=h)
 
 
+# ---------------------------------------------------------------------------
+# Per-cell setup (what was given) and pipeline choices (what the agent did)
+# ---------------------------------------------------------------------------
+
+_MODEL_KEYWORDS = [
+    (r"gaussian process|\bGP\b", "Gaussian process"),
+    (r"kernel ridge", "kernel ridge"),
+    (r"gradient boost", "gradient boosting"),
+    (r"random forest", "random forest"),
+    (r"\bMLP\b|neural net|torch", "MLP / neural net"),
+    (r"\bridge\b", "ridge regression"),
+]
+
+
+def _campaign_given(trace_path: Path) -> dict:
+    """Recover the campaign spec handed to a bench agent from its trace's
+    prompt path (the task YAML). Best-effort: absent pieces are skipped."""
+    import re
+
+    out: dict = {}
+    try:
+        trace = json.loads(Path(trace_path).read_text())
+        task_path = Path(trace["prompt"]["path"])
+        if not task_path.is_absolute():
+            task_path = REPO_ROOT / task_path
+        from autotokamak.bench.taskspec import TaskSpec
+
+        spec = TaskSpec.from_yaml(task_path)
+        p = spec.problem
+        pats = {
+            "initial design": r"initial space-filling design of AT MOST (\d+)",
+            "adaptive rounds": r"UP TO (\d+) ADAPTIVE",
+            "solves per round": r"EXACTLY (\d+) new solver runs",
+            "test solves": r"AT LEAST (\d+)\s+solver\s+runs",
+            "early stop": r"reduced by at least (\d+)%",
+        }
+        for label, pat in pats.items():
+            m = re.search(pat, p)
+            if m:
+                suffix = "% error reduction" if label == "early stop" else ""
+                out[label] = f"≤{m.group(1)}" if label == "initial design" else m.group(1) + suffix
+        out["task"] = spec.task_id
+        out["timeout"] = f"{spec.timeout_seconds}s"
+        out["feedback rounds"] = spec.feedback_rounds
+    except Exception:  # noqa: BLE001
+        pass
+    return out
+
+
+def _first_readme_model_lines(workspace: Path, n: int = 3) -> list[str]:
+    import re
+
+    readme = workspace / "README.md"
+    if not readme.is_file():
+        return []
+    hits = []
+    for line in readme.read_text(errors="replace").splitlines():
+        if any(re.search(pat, line, re.I) for pat, _ in _MODEL_KEYWORDS) or \
+                re.search(r"\bPCA\b", line, re.I):
+            clean = re.sub(r"[#*`]", "", line).strip()
+            if clean and clean not in hits:
+                hits.append(clean)
+        if len(hits) >= n:
+            break
+    return hits
+
+
+def _short_model_label(workspace: Path, meta: dict | None) -> str:
+    import re
+
+    if meta and meta.get("winner_model"):
+        return str(meta["winner_model"])
+    readme = workspace / "README.md"
+    text = readme.read_text(errors="replace") if readme.is_file() else ""
+    fams = [name for pat, name in _MODEL_KEYWORDS if re.search(pat, text, re.I)]
+    label = fams[0] if fams else ""
+    if not label:  # README silent → infer from model artifact extensions
+        if any(workspace.rglob("*.pt")) or any(workspace.rglob("*.pth")):
+            label = "MLP / neural net"
+    label = label or "?"
+    if re.search(r"\bPCA\b", text, re.I):
+        label += " + PCA"
+    return label
+
+
+def _bench_choices(workspace: Path) -> dict:
+    """The agent's own account of its pipeline, from the contract-required
+    report.json fields plus a README scan for the model family."""
+    out: dict = {}
+    rep_path = workspace / "report.json"
+    if rep_path.is_file():
+        try:
+            rep = json.loads(rep_path.read_text())
+        except Exception:  # noqa: BLE001
+            rep = {}
+        out["sampling_strategy"] = rep.get("sampling_strategy")
+        avi = rep.get("adaptive_vs_initial")
+        if isinstance(avi, dict):
+            avi = (avi.get("statement") or avi.get("conclusion")
+                   or avi.get("summary") or json.dumps(avi))
+        out["adaptive_vs_initial"] = avi
+        out["solves"] = (f"{rep.get('n_solves_succeeded', '?')}/"
+                         f"{rep.get('n_solves_attempted', '?')} succeeded; "
+                         f"train={rep.get('n_train', '?')}, test={rep.get('n_test', '?')}")
+        for k, v in rep.items():
+            if "model" in k.lower() or "hyper" in k.lower():
+                out.setdefault("report model fields", {})[k] = v
+    out["model (from README)"] = _first_readme_model_lines(workspace)
+    return out
+
+
+def _meta_setup_and_choices(workspace: Path, manifest: dict) -> tuple[dict, dict]:
+    rep = {}
+    if (workspace / "report.json").is_file():
+        try:
+            rep = json.loads((workspace / "report.json").read_text())
+        except Exception:  # noqa: BLE001
+            pass
+    given = {
+        "max iterations": manifest.get("max_iterations"),
+        "phase-2 time budget": f"{manifest.get('time_budget_seconds')}s",
+        "early stop": (f"{rep.get('target_accuracy_pct')}% error reduction"
+                       if rep.get("target_accuracy_pct") else None),
+        "decision policy": manifest.get("policy"),
+        "seed": manifest.get("seed"),
+    }
+    actions = []
+    for p in sorted(workspace.glob("iterations/*/action.json")):
+        try:
+            a = json.loads(p.read_text())
+            actions.append(f"iter {int(p.parent.name)}: {a.get('action')} — "
+                           f"{str(a.get('diagnosis', ''))[:110]}")
+        except Exception:  # noqa: BLE001
+            continue
+    choices = {
+        "actions taken": actions,
+        "winner model": rep.get("winner_model_name"),
+        "winner hyperparameters": rep.get("winner_hyperparams"),
+        "train pool / test shard": (f"{rep.get('n_train_pool_samples')} / "
+                                    f"{rep.get('n_test_samples')} samples"),
+    }
+    return {k: v for k, v in given.items() if v is not None}, choices
+
+
 # Plain-English meaning of each contract gate, shown whenever it fails.
 GATE_EXPLANATIONS = {
     "report_parses": "report.json exists but is not valid JSON — the agent's "
@@ -307,6 +452,24 @@ def _fmt(v, nd=4):
     return html.escape(str(v))
 
 
+def _render_kv(d: dict) -> str:
+    """Definition list for setup/choices dicts; nested dicts/lists inline."""
+    items = []
+    for k, v in d.items():
+        if v is None or v == [] or v == {}:
+            continue
+        if isinstance(v, dict):
+            vs = "; ".join(f"{ik}={_fmt(iv)}" for ik, iv in v.items())
+        elif isinstance(v, list):
+            vs = "<br>".join(html.escape(str(x)[:220]) for x in v)
+            items.append(f"<li><b>{html.escape(str(k))}</b>:<br>{vs}</li>")
+            continue
+        else:
+            vs = html.escape(str(v)[:400])
+        items.append(f"<li><b>{html.escape(str(k))}</b>: {vs}</li>")
+    return "<ul>" + "".join(items) + "</ul>"
+
+
 def status_span(status, accuracy):
     if status != "completed":
         return f'<span class="bad">{html.escape(str(status))}</span>'
@@ -326,7 +489,7 @@ def build_html(tag: str, rows: list[dict], bars_b64: str, baseline_mean: float) 
         f"baseline mean relL2 = {baseline_mean:.4g}).</p>",
     ]
     tbl = ["<table><tr><th>condition</th><th>what this condition is</th>"
-           "<th>status</th><th>gates</th>"
+           "<th>status</th><th>gates</th><th>surrogate</th>"
            "<th>relL2 mean</th><th>accuracy</th><th>self-reported</th>"
            "<th>wall</th><th>cost</th><th>notes</th></tr>"]
     for r in rows:
@@ -342,6 +505,7 @@ def build_html(tag: str, rows: list[dict], bars_b64: str, baseline_mean: float) 
             f"{html.escape(condition_description(r['condition'], r.get('harness')))}</td>"
             f"<td>{status_span(r.get('status'), acc)}</td>"
             f"<td>{gates_str}</td>"
+            f"<td>{_fmt(r.get('surrogate'))}</td>"
             f"<td>{_fmt(r.get('rel_l2_mean'))}</td>"
             f"<td class='{acc_cls}'>{_fmt(acc, 3)}{'%' if acc is not None else ''}</td>"
             f"<td>{_fmt(r.get('self_reported'))}</td>"
@@ -365,6 +529,11 @@ def build_html(tag: str, rows: list[dict], bars_b64: str, baseline_mean: float) 
                         f"terminated_by=<code>{_fmt(m.get('terminated_by'))}</code>, "
                         f"winner=<code>{_fmt(m.get('winner_model'))}</code>, "
                         f"self-reported accuracy {_fmt(m.get('self_accuracy_pct'), 3)}%</p>")
+        if r.get("given"):
+            body.append("<h3>Setup given</h3>" + _render_kv(r["given"]))
+        if r.get("choices"):
+            body.append("<h3>Pipeline choices made (the agent's own account)</h3>"
+                        + _render_kv(r["choices"]))
         if r.get("error"):
             body.append(f"<p class='bad'>harness error: {html.escape(str(r['error'])[:400])}</p>")
         gates = r.get("contract", {}).get("gates")
@@ -439,8 +608,14 @@ def main() -> int:
                     row["self_reported"] = (sr.get("test_rel_l2") or {}).get("mean")
                 except Exception:  # noqa: BLE001
                     pass
+            row["given"] = _campaign_given(ws.parent / "trace.json")
+            row["choices"] = _bench_choices(ws)
+            row["surrogate"] = _short_model_label(ws, None)
         else:
             row["self_reported"] = (c.get("meta") or {}).get("self_accuracy_pct")
+            row["given"], row["choices"] = _meta_setup_and_choices(
+                c["_workspace"], c.get("_manifest") or {})
+            row["surrogate"] = _short_model_label(c["_workspace"], c.get("meta"))
 
         # Head-to-head on the frozen set.
         try:
