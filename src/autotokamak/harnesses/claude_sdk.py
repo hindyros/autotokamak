@@ -95,11 +95,19 @@ class ClaudeSdkHarness(Harness):
                 model=model_name,
                 max_turns=MAX_TURNS,
             )
+            # Runtime note, not task info: the Bash tool's cwd persists across
+            # calls, so an agent that cd's away (e.g. through the OFT symlink)
+            # silently litters the enclosing repo. Pin it to absolute paths.
+            prompt = (
+                task.render_prompt(self.name)
+                + f"\n\nRUNTIME NOTE: your workspace directory is\n{workspace.resolve()}\n"
+                  "Create ALL files under this directory (absolute paths are "
+                  "safest). Never write outside it, and if you change "
+                  "directory for exploration, change back before writing."
+            )
             step_no = 0
             with events_path.open("w", encoding="utf-8") as events:
-                async for message in query(
-                    prompt=task.render_prompt(self.name), options=options
-                ):
+                async for message in query(prompt=prompt, options=options):
                     kind = type(message).__name__
                     payload = _message_payload(message)
                     events.write(json.dumps({"kind": kind, **payload}, default=str) + "\n")
@@ -126,6 +134,15 @@ class ClaudeSdkHarness(Harness):
             status, error = "interrupted", "KeyboardInterrupt"
         except Exception as exc:  # noqa: BLE001
             status, error = "errored", f"{type(exc).__name__}: {exc}"
+
+        # An agent that escaped its cwd leaves the workspace empty (symlinks
+        # aside) while claiming success — flag it instead of trusting it.
+        if status == "completed":
+            written = [p for p in workspace.iterdir() if not p.is_symlink()]
+            if not written:
+                status = "errored"
+                error = ("workspace empty after a 'successful' session — the "
+                         "agent likely wrote its files outside its cwd")
 
         trace.record_artifacts(workspace, expected_artifacts=task.expected_artifacts)
         if status == "completed":

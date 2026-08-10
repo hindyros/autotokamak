@@ -120,7 +120,9 @@ def run_predict(
     python: str = sys.executable,
 ) -> dict[str, np.ndarray]:
     """Invoke workspace ``predict.py`` per contract; return the npz arrays."""
-    workspace = Path(workspace)
+    # Resolve so the temp params/pred paths stay valid under cwd=workspace
+    # even when the caller passed a repo-relative workspace path.
+    workspace = Path(workspace).resolve()
     with tempfile.TemporaryDirectory(dir=workspace) as td:
         inp = Path(td) / "params.json"
         out = Path(td) / "pred.npz"
