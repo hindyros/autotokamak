@@ -19,5 +19,6 @@ see `benchmarks/README.md`.)
 | `trace_to_html.py` | Renders `experiments/*/trace.json` into a browsable static HTML report (stdlib-only). |
 | `probe_feasible_box.py` | LHS-samples candidate shaping-parameter boxes and reports the clean-isoflux success rate per box. |
 | `collect_traces.sh` | Runs the meta-loop N times to collect traces for offline GEPA prompt optimization (`agent/dspy/optimize_meta.py`). |
+| `matrix_report.py` | Cross-condition matrix report: scores every cell (bench `predict.py` or pipeline `winner.pkl`) on the frozen benchmark test set; renders `experiments/<tag>/index.html`. |
 
 Each script's module docstring documents its exact CLI; run with `--help` for flags.
