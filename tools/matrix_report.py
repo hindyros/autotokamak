@@ -308,7 +308,7 @@ def _campaign_given(trace_path: Path) -> dict:
             if m:
                 suffix = "% error reduction" if label == "early stop" else ""
                 out[label] = f"≤{m.group(1)}" if label == "initial design" else m.group(1) + suffix
-        out["task"] = spec.task_id
+        out["task"] = f"{spec.task_id} (prompt v{spec.prompt_version})"
         out["timeout"] = f"{spec.timeout_seconds}s"
         out["feedback rounds"] = spec.feedback_rounds
     except Exception:  # noqa: BLE001

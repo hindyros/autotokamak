@@ -36,6 +36,9 @@ class TaskSpec(BaseModel):
     timeout_seconds: int = Field(default=21600, ge=60)
     # Consumed by harnesses that support outer feedback/fix loops.
     feedback_rounds: int = Field(default=1, ge=1, le=5)
+    # Bump whenever the problem text changes. Runs are only comparable within
+    # one version; traces also record the YAML's sha256.
+    prompt_version: int = Field(default=1, ge=1)
 
     # Set by from_yaml; lets harnesses resolve relative paths.
     source_path: Optional[Path] = None

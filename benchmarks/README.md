@@ -60,6 +60,23 @@ Archived agent-generated workspaces from the pre-refactor capability tests
 The READMEs are tracked documentation of those experiments; the workspaces
 are agent output, kept on disk, gitignored, and NEVER edited.
 
+## Prompt versioning
+
+Task problem texts are frozen comparability assets: **runs are only
+comparable within one prompt version.** Any change to a problem text goes
+into a new `_v2`/`_v3` file with a bumped `prompt_version:` field and a
+header explaining what changed and why — never an in-place edit. Each run's
+`result.json` records `task.prompt_version` and the trace records the YAML's
+sha256, so every result is attributable to its exact prompt. Version changes
+must be process-level (engineering-discipline gates, identical for every
+harness) — never physics/ML hints, and never per-harness. The version ladder
+is itself data: what each added gate does to where agents fail is part of
+the experiment.
+
+Current versions: v1 = original capability-test text; v2 (2026-08-10) adds
+the STORAGE VALIDATION GATE and DELIVERABLE SELF-TEST after the URSA agent
+stored all-NaN datasets as successes and shipped an untested predict.py.
+
 ## Adding a harness
 
 One adapter module in `src/autotokamak/harnesses/` implementing

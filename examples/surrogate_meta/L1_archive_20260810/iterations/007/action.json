@@ -1,0 +1,14 @@
+{
+  "action": "enrich_active",
+  "regen": null,
+  "enrich": {
+    "n_new": 200,
+    "strategy": "residual_ucb",
+    "beta": 0.7,
+    "feasibility_weighting": true,
+    "rationale": "Residual-driven active learning will place new solves where the current winner is measurably weakest along the correlated input directions, giving the best chance to close the remaining RMSE gap efficiently."
+  },
+  "extend": null,
+  "terminate": null,
+  "diagnosis": "RMSE is still data-limited with structured residuals aligned to (r0, a, kappa, delta, Ip), not a tuning plateau."
+}

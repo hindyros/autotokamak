@@ -63,6 +63,11 @@ def cmd_run(args) -> int:
     )
 
     payload = result.to_dict()
+    payload["task"] = {
+        "task_id": task.task_id,
+        "prompt_version": task.prompt_version,
+        "path": str(task.source_path),
+    }
 
     from autotokamak.bench.contract import score_against_frozen, validate_deliverables
 

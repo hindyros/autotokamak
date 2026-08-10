@@ -1,0 +1,29 @@
+{
+  "n_iterations": 1,
+  "terminated_by": "target_reached",
+  "target_rmse": 0.0005906132042558371,
+  "initial_rmse": 0.0005745287761246506,
+  "final_rmse": 0.0005745287761246506,
+  "baseline_rmse": 0.0023624528170233484,
+  "target_accuracy_pct": 75.0,
+  "final_accuracy_pct": 75.68083595216318,
+  "target_worst_cell_accuracy_pct": null,
+  "final_worst_cell_accuracy_pct": null,
+  "eval_mode": "seed_shard",
+  "eval_per_cell": null,
+  "test_shard_path": "/Users/hindy/Desktop/Deep Deka/autokamak/examples/surrogate_meta/fast/datasets/test_shard.h5",
+  "n_test_samples": 300,
+  "n_train_pool_samples": 1699,
+  "winner_model_name": "kernel_ridge",
+  "winner_hyperparams": {
+    "alpha": 2.3002977356771835e-6,
+    "gamma": 0.16735000803774894,
+    "kernel": "laplacian"
+  },
+  "rmse_history": [
+    0.0005745287761246506
+  ],
+  "actions_taken": [
+    "extend_search"
+  ]
+}

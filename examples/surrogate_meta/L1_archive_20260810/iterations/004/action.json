@@ -1,0 +1,14 @@
+{
+  "action": "enrich_active",
+  "regen": null,
+  "enrich": {
+    "n_new": 200,
+    "strategy": "residual_ucb",
+    "beta": 0.7,
+    "feasibility_weighting": true,
+    "rationale": "Residual-driven active learning will place new solves where the current winner’s errors are predictably largest along those correlated directions, maximizing RMSE reduction per added sample."
+  },
+  "extend": null,
+  "terminate": null,
+  "diagnosis": "The surrogate is still sample-bottlenecked with residuals strongly structured along specific input directions (r0, a, kappa, delta, Ip), not tuning-limited."
+}

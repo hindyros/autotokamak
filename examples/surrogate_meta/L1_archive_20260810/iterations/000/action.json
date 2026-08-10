@@ -1,0 +1,20 @@
+{
+  "action": "extend_search",
+  "regen": null,
+  "enrich": null,
+  "extend": {
+    "models_to_emphasize": [],
+    "widen_params": [
+      "model.n_pca_components",
+      "model.hidden_width",
+      "model.hidden_depth",
+      "model.weight_decay",
+      "model.rbf_lengthscale",
+      "model.alpha"
+    ],
+    "n_trials_hint": 80,
+    "rationale": "Extending the surrogate search establishes a first winner.pkl/report.json and can directly address the indicated representation bottleneck by exploring higher PCA component counts and richer model classes."
+  },
+  "terminate": null,
+  "diagnosis": "Cold start: no tuned surrogate baseline exists yet, so current diagnostics (esp. learning curve) are not actionable for deciding data acquisition."
+}

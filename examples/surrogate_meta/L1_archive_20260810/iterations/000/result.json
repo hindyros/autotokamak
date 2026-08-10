@@ -1,0 +1,21 @@
+{
+  "kind": "extend_search",
+  "mode": "structured",
+  "sub_workspace": "/Users/hindy/Desktop/Deep Deka/autokamak/examples/surrogate_meta/fast/surrogate_runs/iter0",
+  "elapsed_seconds": 2028.0997550487518,
+  "n_rounds": 1,
+  "terminated_by": "rounds_cap",
+  "nested_val_rmse": 0.0006018482960992279,
+  "shard_rmse": 0.0005745287761246506,
+  "winner_path": "/Users/hindy/Desktop/Deep Deka/autokamak/examples/surrogate_meta/fast/surrogate_runs/iter0/outputs/winner.pkl",
+  "models_emphasized": [],
+  "widen_params": [
+    "model.n_pca_components",
+    "model.hidden_width",
+    "model.hidden_depth",
+    "model.weight_decay",
+    "model.rbf_lengthscale",
+    "model.alpha"
+  ],
+  "rationale": "Extending the surrogate search establishes a first winner.pkl/report.json and can directly address the indicated representation bottleneck by exploring higher PCA component counts and richer model classes."
+}

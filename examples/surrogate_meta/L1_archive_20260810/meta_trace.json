@@ -1,0 +1,150 @@
+{
+  "iterations": [
+    {
+      "iteration": 0,
+      "started_utc": "2026-07-20T21:09:08.179466+00:00",
+      "finished_utc": "2026-07-20T21:42:56.303918+00:00",
+      "diagnostics": {
+        "learning_curve": {
+          "curve": {
+            "8": 0.003110236918208355,
+            "12": 0.0024945486168907937,
+            "16": 0.002390276945265964
+          },
+          "slope_log_log": -0.14842274142455372,
+          "plateau_detected": false,
+          "interpretation": "RMSE still dropping with N \u2192 sample-bottlenecked; regenerate at higher N"
+        },
+        "cross_seed_variance": {
+          "per_seed": {
+            "0": 0.0011259615139619429,
+            "1": 0.0011236559756283495,
+            "2": 0.0011298594401672434
+          },
+          "mean_rmse": 0.0011264923099191786,
+          "cv": 0.002272731900323588,
+          "high_variance": false,
+          "interpretation": "splits stable \u2192 measurement is meaningful"
+        },
+        "pca_spectrum": {
+          "explained_per_component": [
+            0.36113079752520205,
+            0.20873308888405567,
+            0.1163506617216122,
+            0.06339502442618979,
+            0.03769995574484609,
+            0.027746388985419604,
+            0.02044726954977756,
+            0.015991171265129812,
+            0.011588460525058148,
+            0.010337717752021709,
+            0.009469742655364228,
+            0.008400862442450705,
+            0.006304720201830709,
+            0.0054833710040601644,
+            0.004983187731009414,
+            0.00424020762412016
+          ],
+          "cumulative": [
+            0.36113079752520205,
+            0.5698638864092578,
+            0.68621454813087,
+            0.7496095725570598,
+            0.7873095283019059,
+            0.8150559172873255,
+            0.8355031868371031,
+            0.851494358102233,
+            0.8630828186272911,
+            0.8734205363793128,
+            0.8828902790346771,
+            0.8912911414771278,
+            0.8975958616789586,
+            0.9030792326830187,
+            0.9080624204140281,
+            0.9123026280381482
+          ],
+          "n_components_for_95pct": null,
+          "tail_energy_above_8": 0.06080826993591524,
+          "interpretation": "max_components insufficient to reach 95% variance \u2014 increase n_pca_components"
+        }
+      },
+      "decision": {
+        "action": "extend_search",
+        "regen": null,
+        "enrich": null,
+        "extend": {
+          "models_to_emphasize": [],
+          "widen_params": [
+            "model.n_pca_components",
+            "model.hidden_width",
+            "model.hidden_depth",
+            "model.weight_decay",
+            "model.rbf_lengthscale",
+            "model.alpha"
+          ],
+          "n_trials_hint": 80,
+          "rationale": "Extending the surrogate search establishes a first winner.pkl/report.json and can directly address the indicated representation bottleneck by exploring higher PCA component counts and richer model classes."
+        },
+        "terminate": null,
+        "diagnosis": "Cold start: no tuned surrogate baseline exists yet, so current diagnostics (esp. learning curve) are not actionable for deciding data acquisition."
+      },
+      "result": {
+        "kind": "extend_search",
+        "mode": "structured",
+        "sub_workspace": "/Users/hindy/Desktop/Deep Deka/autokamak/examples/surrogate_meta/fast/surrogate_runs/iter0",
+        "elapsed_seconds": 2028.0997550487518,
+        "n_rounds": 1,
+        "terminated_by": "rounds_cap",
+        "nested_val_rmse": 0.0006018482960992279,
+        "shard_rmse": 0.0005745287761246506,
+        "winner_path": "/Users/hindy/Desktop/Deep Deka/autokamak/examples/surrogate_meta/fast/surrogate_runs/iter0/outputs/winner.pkl",
+        "models_emphasized": [],
+        "widen_params": [
+          "model.n_pca_components",
+          "model.hidden_width",
+          "model.hidden_depth",
+          "model.weight_decay",
+          "model.rbf_lengthscale",
+          "model.alpha"
+        ],
+        "rationale": "Extending the surrogate search establishes a first winner.pkl/report.json and can directly address the indicated representation bottleneck by exploring higher PCA component counts and richer model classes."
+      },
+      "rmse_after": 0.0005745287761246506,
+      "parent_run_id": null,
+      "picker_inputs": {
+        "diagnostics_json": "{\n  \"learning_curve\": {\n    \"curve\": {\n      \"8\": 0.003110236918208355,\n      \"12\": 0.0024945486168907937,\n      \"16\": 0.002390276945265964\n    },\n    \"slope_log_log\": -0.14842274142455372,\n    \"plateau_detected\": false,\n    \"interpretation\": \"RMSE still dropping with N \\u2192 sample-bottlenecked; regenerate at higher N\"\n  },\n  \"cross_seed_variance\": {\n    \"per_seed\": {\n      \"0\": 0.0011259615139619429,\n      \"1\": 0.0011236559756283495,\n      \"2\": 0.0011298594401672434\n    },\n    \"mean_rmse\": 0.0011264923099191786,\n    \"cv\": 0.002272731900323588,\n    \"high_variance\": false,\n    \"interpretation\": \"splits stable \\u2192 measurement is meaningful\"\n  },\n  \"pca_spectrum\": {\n    \"explained_per_component\": [\n      0.36113079752520205,\n      0.20873308888405567,\n      0.1163506617216122,\n      0.06339502442618979,\n      0.03769995574484609,\n      0.027746388985419604,\n      0.02044726954977756,\n      0.015991171265129812,\n      0.011588460525058148,\n      0.010337717752021709,\n      0.009469742655364228,\n      0.008400862442450705,\n      0.006304720201830709,\n      0.0054833710040601644,\n      0.004983187731009414,\n      0.00424020762412016\n    ],\n    \"cumulative\": [\n      0.36113079752520205,\n      0.5698638864092578,\n      0.68621454813087,\n      0.7496095725570598,\n      0.7873095283019059,\n      0.8150559172873255,\n      0.8355031868371031,\n      0.851494358102233,\n      0.8630828186272911,\n      0.8734205363793128,\n      0.8828902790346771,\n      0.8912911414771278,\n      0.8975958616789586,\n      0.9030792326830187,\n      0.9080624204140281,\n      0.9123026280381482\n    ],\n    \"n_components_for_95pct\": null,\n    \"tail_energy_above_8\": 0.06080826993591524,\n    \"interpretation\": \"max_components insufficient to reach 95% variance \\u2014 increase n_pca_components\"\n  }\n}",
+        "history_summary": "{\n  \"prior_decisions\": [],\n  \"rmse_history\": []\n}",
+        "state_summary": "{\n  \"iteration\": 0,\n  \"iterations_remaining\": 10,\n  \"current_dataset\": \"/Users/hindy/Desktop/Deep Deka/autokamak/examples/surrogate_meta/fast/datasets/train_pool.h5\",\n  \"best_rmse_so_far\": null,\n  \"target_rmse\": 0.0005906132042558371\n}"
+      }
+    }
+  ],
+  "report": {
+    "n_iterations": 1,
+    "terminated_by": "target_reached",
+    "target_rmse": 0.0005906132042558371,
+    "initial_rmse": 0.0005745287761246506,
+    "final_rmse": 0.0005745287761246506,
+    "baseline_rmse": 0.0023624528170233484,
+    "target_accuracy_pct": 75.0,
+    "final_accuracy_pct": 75.68083595216318,
+    "target_worst_cell_accuracy_pct": null,
+    "final_worst_cell_accuracy_pct": null,
+    "eval_mode": "seed_shard",
+    "eval_per_cell": null,
+    "test_shard_path": "/Users/hindy/Desktop/Deep Deka/autokamak/examples/surrogate_meta/fast/datasets/test_shard.h5",
+    "n_test_samples": 300,
+    "n_train_pool_samples": 1699,
+    "winner_model_name": "kernel_ridge",
+    "winner_hyperparams": {
+      "alpha": 2.3002977356771835e-06,
+      "gamma": 0.16735000803774894,
+      "kernel": "laplacian"
+    },
+    "rmse_history": [
+      0.0005745287761246506
+    ],
+    "actions_taken": [
+      "extend_search"
+    ]
+  }
+}

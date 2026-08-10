@@ -1,0 +1,14 @@
+{
+  "action": "enrich_active",
+  "regen": null,
+  "enrich": {
+    "n_new": 120,
+    "strategy": "residual_ucb",
+    "beta": 0.6,
+    "feasibility_weighting": true,
+    "rationale": "Residual-UCB active enrichment will place the final batch directly in the model’s demonstrated weak regions, maximizing the chance of achieving the remaining RMSE reduction within one iteration."
+  },
+  "extend": null,
+  "terminate": null,
+  "diagnosis": "The surrogate remains sample-bottlenecked with strongly structured residuals aligned with (r0, a, kappa, delta, Ip), indicating missing targeted coverage rather than a tuning plateau."
+}

@@ -1,0 +1,18 @@
+{
+  "pipeline": "meta",
+  "mode": "fast",
+  "run_id": "20260720T214256Z",
+  "output_dir": "/Users/hindy/Desktop/Deep Deka/autokamak/examples/surrogate_meta/fast",
+  "elapsed_seconds": 2048.7,
+  "n_iterations": 1,
+  "terminated_by": "target_reached",
+  "final_rmse": 0.0005745287761246506,
+  "baseline_rmse": 0.0023624528170233484,
+  "final_accuracy_pct": 75.68083595216318,
+  "final_worst_cell_accuracy_pct": null,
+  "winner_model_name": "kernel_ridge",
+  "phase2_mode": "structured",
+  "max_iterations": 10,
+  "enrich_n_new": null,
+  "time_budget_seconds": 600
+}
