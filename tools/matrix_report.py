@@ -156,20 +156,20 @@ def plot_accuracy_bars(rows: list[dict]) -> str:
 
     scored = [r for r in rows if r.get("accuracy_pct") is not None]
     fig, ax = plt.subplots(figsize=(9, 3.6))
-    fig.patch.set_facecolor("#14171c"); ax.set_facecolor("#14171c")
+    fig.patch.set_facecolor("white"); ax.set_facecolor("white")
     if scored:
         names = [r["condition"] for r in scored]
         vals = [r["accuracy_pct"] for r in scored]
-        colors = ["#4cc38a" if v >= 70 else "#e5a13c" if v >= 0 else "#e5534b" for v in vals]
+        colors = ["#1a7f37" if v >= 70 else "#d4a72c" if v >= 0 else "#cf222e" for v in vals]
         ax.bar(names, vals, color=colors)
-        ax.axhline(70, color="#e5534b", lw=1, ls="--", label="70% target")
-        ax.legend(facecolor="#14171c", labelcolor="#c9d1d9", edgecolor="#333")
-    ax.set_ylabel("accuracy vs baseline [%]", color="#c9d1d9")
-    ax.tick_params(colors="#c9d1d9", labelrotation=25)
+        ax.axhline(70, color="#cf222e", lw=1, ls="--", label="70% target")
+        ax.legend(facecolor="white", labelcolor="#1f2328", edgecolor="#d0d7de")
+    ax.set_ylabel("accuracy vs baseline [%]", color="#1f2328")
+    ax.tick_params(colors="#1f2328", labelrotation=25)
     for s in ax.spines.values():
-        s.set_color("#333")
+        s.set_color("#d0d7de")
     ax.set_title("Frozen-test-set accuracy = 100·(1 − relL2 / baseline relL2)",
-                 color="#c9d1d9", fontsize=10)
+                 color="#1f2328", fontsize=10)
     return _fig_to_b64(fig)
 
 
@@ -181,7 +181,7 @@ def plot_psi_panels(psi_pred, frozen, title: str) -> str:
     R, Z = frozen["R"], frozen["Z"]
     idx = np.linspace(0, len(frozen["psi"]) - 1, N_PLOT_SAMPLES).astype(int)
     fig, axes = plt.subplots(len(idx), 3, figsize=(9.5, 2.9 * len(idx)))
-    fig.patch.set_facecolor("#14171c")
+    fig.patch.set_facecolor("white")
     axes = np.atleast_2d(axes)
     for row, i in enumerate(idx):
         true, pred = frozen["psi"][i], psi_pred[i]
@@ -191,16 +191,16 @@ def plot_psi_panels(psi_pred, frozen, title: str) -> str:
              (err, "|error| [Wb]", "magma")]
         ):
             ax = axes[row, col]
-            ax.set_facecolor("#14171c")
+            ax.set_facecolor("white")
             pc = ax.pcolormesh(R, Z, fld, cmap=cmap, shading="auto")
             cb = fig.colorbar(pc, ax=ax, shrink=0.85)
-            cb.ax.tick_params(colors="#c9d1d9", labelsize=7)
-            ax.set_title(f"#{i}  {name}", color="#c9d1d9", fontsize=8)
-            ax.tick_params(colors="#c9d1d9", labelsize=7)
+            cb.ax.tick_params(colors="#1f2328", labelsize=7)
+            ax.set_title(f"#{i}  {name}", color="#1f2328", fontsize=8)
+            ax.tick_params(colors="#1f2328", labelsize=7)
             ax.set_aspect("equal")
             for s in ax.spines.values():
-                s.set_color("#333")
-    fig.suptitle(title, color="#c9d1d9", fontsize=11)
+                s.set_color("#d0d7de")
+    fig.suptitle(title, color="#1f2328", fontsize=11)
     fig.tight_layout(rect=(0, 0, 1, 0.97))
     return _fig_to_b64(fig)
 
@@ -210,20 +210,56 @@ def plot_psi_panels(psi_pred, frozen, title: str) -> str:
 # ---------------------------------------------------------------------------
 
 CSS = """
-body { background:#0d1117; color:#c9d1d9; font-family:-apple-system,'Segoe UI',sans-serif;
+body { background:#ffffff; color:#1f2328; font-family:-apple-system,'Segoe UI',sans-serif;
        margin:0 auto; max-width:1080px; padding:24px; }
-h1,h2,h3 { color:#e6edf3; } a { color:#58a6ff; }
+h1,h2,h3 { color:#111418; } a { color:#0969da; }
 table { border-collapse:collapse; width:100%; font-size:13px; margin:12px 0; }
-th,td { border:1px solid #30363d; padding:6px 9px; text-align:left; }
-th { background:#161b22; } tr:nth-child(even) { background:#11151b; }
-.ok { color:#4cc38a; font-weight:600; } .warn { color:#e5a13c; font-weight:600; }
-.bad { color:#e5534b; font-weight:600; }
-.cell { background:#14171c; border:1px solid #30363d; border-radius:8px;
+th,td { border:1px solid #d0d7de; padding:6px 9px; text-align:left; }
+th { background:#f6f8fa; } tr:nth-child(even) { background:#fafbfc; }
+.ok { color:#1a7f37; font-weight:600; } .warn { color:#9a6700; font-weight:600; }
+.bad { color:#cf222e; font-weight:600; }
+.cell { background:#fafbfc; border:1px solid #d0d7de; border-radius:8px;
         padding:14px 18px; margin:14px 0; }
 img { max-width:100%; border-radius:6px; }
-code { background:#161b22; padding:1px 5px; border-radius:4px; font-size:12px; }
-.small { color:#8b949e; font-size:12px; }
+code { background:#f6f8fa; padding:1px 5px; border-radius:4px; font-size:12px; }
+.small { color:#57606a; font-size:12px; }
 """
+
+
+HARNESS_NAMES = {
+    "none": "no agent",
+    "ursa": "the URSA agent (LangChain plan→execute)",
+    "dspy": "the DSPy agent (plan → ReAct steps → review)",
+    "claude_sdk": "the Claude Agent SDK",
+    "pi": "the Pi Code CLI agent",
+    "cursor": "the Cursor CLI agent",
+    "echo": "a no-LLM mock agent",
+}
+
+LEVEL_DESCRIPTIONS = {
+    "L0": "Golden baseline: the pre-written pipeline ran with every decision "
+          "(which models to search, which meta-action to take next) made by "
+          "seeded heuristic rules. No LLM is involved anywhere, so the run is "
+          "exactly reproducible.",
+    "L1": "Pre-written pipeline, LLM judgment only: the same library code ran, "
+          "but an LLM made the typed decisions at the two choice points "
+          "(search rounds and meta-actions). Measures the value of LLM "
+          "decision-making with all code held fixed.",
+    "L2": "Library-assisted agent: {h} wrote and ran the pipeline code itself, "
+          "and was allowed (and encouraged) to build on the autotokamak "
+          "library for solving, sampling, and training. Measures agent skill "
+          "when proven scaffolding is available.",
+    "L3": "From-scratch agent: {h} built the entire pipeline — solver driving, "
+          "adaptive sampling campaign, surrogate training, evaluation — with "
+          "only the raw TokaMaker solver available. Importing autotokamak is "
+          "forbidden and audited by a hard contract gate.",
+}
+
+
+def condition_description(condition: str, harness) -> str:
+    level = str(condition)[:2]
+    h = HARNESS_NAMES.get(str(harness), str(harness))
+    return LEVEL_DESCRIPTIONS.get(level, "").format(h=h)
 
 
 def _fmt(v, nd=4):
@@ -252,7 +288,8 @@ def build_html(tag: str, rows: list[dict], bars_b64: str, baseline_mean: float) 
         f"test set (n={rows[0]['n_scored'] if rows and rows[0].get('n_scored') else '—'}, "
         f"baseline mean relL2 = {baseline_mean:.4g}).</p>",
     ]
-    tbl = ["<table><tr><th>condition</th><th>status</th><th>gates</th>"
+    tbl = ["<table><tr><th>condition</th><th>what this condition is</th>"
+           "<th>status</th><th>gates</th>"
            "<th>relL2 mean</th><th>accuracy</th><th>self-reported</th>"
            "<th>wall</th><th>cost</th><th>notes</th></tr>"]
     for r in rows:
@@ -264,6 +301,8 @@ def build_html(tag: str, rows: list[dict], bars_b64: str, baseline_mean: float) 
         tbl.append(
             "<tr>"
             f"<td><b>{html.escape(r['condition'])}</b></td>"
+            f"<td class='small' style='max-width:260px'>"
+            f"{html.escape(condition_description(r['condition'], r.get('harness')))}</td>"
             f"<td>{status_span(r.get('status'), acc)}</td>"
             f"<td>{gates_str}</td>"
             f"<td>{_fmt(r.get('rel_l2_mean'))}</td>"
@@ -279,6 +318,7 @@ def build_html(tag: str, rows: list[dict], bars_b64: str, baseline_mean: float) 
 
     for r in rows:
         body.append(f'<div class="cell"><h2>{html.escape(r["condition"])}</h2>')
+        body.append(f"<p>{html.escape(condition_description(r['condition'], r.get('harness')))}</p>")
         body.append(f"<p class='small'>harness=<code>{_fmt(r.get('harness'))}</code> "
                     f"model=<code>{_fmt(r.get('model'))}</code> "
                     f"run_id=<code>{_fmt(r.get('run_id'))}</code></p>")
