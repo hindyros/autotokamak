@@ -223,6 +223,10 @@ th { background:#f6f8fa; } tr:nth-child(even) { background:#fafbfc; }
 img { max-width:100%; border-radius:6px; }
 code { background:#f6f8fa; padding:1px 5px; border-radius:4px; font-size:12px; }
 .small { color:#57606a; font-size:12px; }
+.gatefail { background:#fff5f5; border:1px solid #ffcdd2; border-radius:6px;
+            padding:8px 12px; margin:8px 0; }
+pre { background:#f6f8fa; border:1px solid #d0d7de; border-radius:6px;
+      padding:8px 10px; font-size:11px; overflow-x:auto; white-space:pre-wrap; }
 """
 
 
@@ -260,6 +264,39 @@ def condition_description(condition: str, harness) -> str:
     level = str(condition)[:2]
     h = HARNESS_NAMES.get(str(harness), str(harness))
     return LEVEL_DESCRIPTIONS.get(level, "").format(h=h)
+
+
+# Plain-English meaning of each contract gate, shown whenever it fails.
+GATE_EXPLANATIONS = {
+    "report_parses": "report.json exists but is not valid JSON — the agent's "
+                     "machine-readable summary cannot be read at all.",
+    "report_keys": "report.json is missing required fields. The contract "
+                   "requires solve counts and test/baseline relative-L2 "
+                   "metrics (mean, median, p90); without them the run cannot "
+                   "be compared to other conditions. This usually means the "
+                   "campaign did not produce a test set, or the agent used "
+                   "its own report layout.",
+    "predict_runs": "The prediction script crashed when invoked with the "
+                    "contract CLI (python predict.py --input params.json "
+                    "--output pred.npz). The agent shipped code it did not "
+                    "re-test after its last edits.",
+    "predict_shape": "predict.py ran, but the returned psi array is not "
+                     "shaped (N, 96, 64) = (samples, nZ, nR) as the frozen "
+                     "evaluation interface requires.",
+    "predict_grid": "predict.py ran, but the R/Z axes it returned differ "
+                    "from the frozen evaluation grid, so its predictions "
+                    "are not comparable to other conditions.",
+    "no_autotokamak_import": "A workspace Python file imports autotokamak — "
+                             "forbidden in the from-scratch (L3) condition. "
+                             "This is the cheating audit.",
+}
+
+
+def _explain_gate(gate: str) -> str:
+    if gate.startswith("artifact:"):
+        return (f"The required deliverable '{gate.split(':', 1)[1]}' is "
+                "missing from the workspace (or is empty).")
+    return GATE_EXPLANATIONS.get(gate, "")
 
 
 def _fmt(v, nd=4):
@@ -329,13 +366,27 @@ def build_html(tag: str, rows: list[dict], bars_b64: str, baseline_mean: float) 
                         f"winner=<code>{_fmt(m.get('winner_model'))}</code>, "
                         f"self-reported accuracy {_fmt(m.get('self_accuracy_pct'), 3)}%</p>")
         if r.get("error"):
-            body.append(f"<p class='bad'>error: {html.escape(str(r['error'])[:400])}</p>")
+            body.append(f"<p class='bad'>harness error: {html.escape(str(r['error'])[:400])}</p>")
         gates = r.get("contract", {}).get("gates")
+        notes = r.get("contract", {}).get("notes") or {}
         if gates:
             failed = [k for k, v in gates.items() if not v]
-            body.append("<p>contract gates: " + (
-                '<span class="ok">all passed</span>' if not failed
-                else f'<span class="bad">failed: {html.escape(", ".join(failed))}</span>') + "</p>")
+            if not failed:
+                body.append('<p>contract gates: <span class="ok">all passed</span></p>')
+            else:
+                body.append(f'<p>contract gates: <span class="bad">'
+                            f'{len(failed)} failed</span></p>')
+                for gate in failed:
+                    body.append('<div class="gatefail">')
+                    body.append(f'<p><span class="bad">✗ {html.escape(gate)}</span> — '
+                                f'{html.escape(_explain_gate(gate))}</p>')
+                    if notes.get(gate):
+                        body.append("<p class='small'>evidence:</p>"
+                                    f"<pre>{html.escape(str(notes[gate])[:2500])}</pre>")
+                    body.append("</div>")
+        if r.get("note"):
+            body.append(f"<p class='warn'>scoring note: "
+                        f"{html.escape(str(r['note'])[:600])}</p>")
         if r.get("psi_b64"):
             body.append(f'<img src="data:image/png;base64,{r["psi_b64"]}">')
         body.append("</div>")
