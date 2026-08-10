@@ -1,0 +1,14 @@
+{
+  "action": "enrich_active",
+  "regen": null,
+  "enrich": {
+    "n_new": 200,
+    "strategy": "residual_ucb",
+    "beta": 0.6,
+    "feasibility_weighting": true,
+    "rationale": "Residual-driven active learning will preferentially add new solves where the model’s predicted error is highest along those correlated inputs, yielding better RMSE reduction per sample than blind resampling."
+  },
+  "extend": null,
+  "terminate": null,
+  "diagnosis": "The current bottleneck is sample coverage in specific input directions (r0, a, kappa, delta, Ip) producing structured residuals, not split noise or a clear learning-curve plateau."
+}

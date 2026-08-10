@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Plan–execute runner with a global feedback loop.
 
 Same interface as agent.plan_execute, but after the first plan+execute cycle the planner
@@ -16,23 +17,24 @@ Config (YAML) may include:
 
 Each invocation also writes a structured trace to ``experiments/<run_id>/trace.json``
 (unless ``--no-trace`` is given). The trace shape is defined in
-``agent.runners.trace`` and is the substrate for the DSPy integration plan
+``bench.trace`` and is the substrate for the DSPy integration plan
 (see ``docs/dspy_integration_plan.md``).
 """
 
 import argparse
 import sys
+from pathlib import Path
 
 from dotenv import load_dotenv
 
-from agent.runners.config import (
+from autotokamak.agent.runners.config import (
     REPO_ROOT,
     load_config,
     materialize_symlinks,
     resolve_workspace,
 )
-from agent.runners.scoring import try_score
-from agent.runners.trace import RunTrace
+from autotokamak.bench.scoring import try_score
+from autotokamak.bench.trace import RunTrace
 
 load_dotenv(REPO_ROOT / ".env")
 
@@ -100,66 +102,27 @@ def _hygiene_warning(workspace_path, cfg) -> str:
     return _hygiene_enforce(workspace_path, cfg)
 
 
-def main(
-    config_path: str,
-    cli_model: str | None,
-    workspace_override: str | None,
+def run_feedback_loop(
     *,
-    trace_enabled: bool = True,
-    experiments_dir=None,
-):
-    cfg = load_config(config_path)
+    problem: str,
+    workspace_path,
+    model_name: str,
+    feedback_rounds: int = 2,
+    validate_after: bool = False,
+    trace: RunTrace | None = None,
+    expected_artifacts=None,
+    scorer_dotted: str | None = None,
+    scorer_kwargs: dict | None = None,
+) -> str:
+    """The plan→execute→re-plan engine, decoupled from YAML/CLI plumbing.
 
-    problem = getattr(cfg, "problem", None)
-    if not problem:
-        raise ValueError("config.yaml must contain a top-level 'problem:' string")
-
-    scorer_dotted = getattr(cfg, "scorer", None)
-    scorer_kwargs = getattr(cfg, "scorer_kwargs", None) or {}
-    expected_artifacts = getattr(cfg, "expected_artifacts", None)
-
-    model_name = (
-        cli_model
-        or getattr(cfg, "model", None)
-        or "openai:gpt-5-mini"
-    )
-    print(f"\nUsing model: {model_name}")
-
-    workspace_path = resolve_workspace(
-        workspace_override
-        or getattr(cfg, "workspace", None)
-        or "mini_workspace"
-    )
-    workspace_path.mkdir(parents=True, exist_ok=True)
+    ``main`` (the YAML-config CLI) and ``harnesses.ursa`` (the benchmark
+    adapter) both call this. Returns the final execution summary. The
+    workspace must already exist with any symlinks materialized; ``trace``
+    (if given) is finalized here — completed/errored/interrupted.
+    """
+    scorer_kwargs = scorer_kwargs or {}
     workspace = str(workspace_path)
-
-    # URSA only supports a single symlinkdir dict; we materialize the YAML's
-    # `symlinks:` list ourselves and pass None to URSA to skip its broken path.
-    symlink_entries = getattr(cfg, "symlinks", None) or getattr(cfg, "symlink", None)
-    if isinstance(symlink_entries, dict):
-        symlink_entries = [symlink_entries]
-    materialize_symlinks(workspace_path, symlink_entries)
-
-    feedback_rounds = max(1, int(getattr(cfg, "feedback_rounds", 2)))
-    validate_after = getattr(cfg, "validate_after", False)
-
-    # Structured trace for DSPy integration. All trace I/O is best-effort
-    # inside RunTrace.save() — failures will not abort the run.
-    trace: RunTrace | None = None
-    if trace_enabled:
-        try:
-            target_dir = experiments_dir if experiments_dir is not None else DEFAULT_EXPERIMENTS_DIR
-            trace = RunTrace.open(
-                experiments_dir=target_dir,
-                prompt_path=REPO_ROOT / config_path if not str(config_path).startswith("/") else config_path,
-                model=model_name,
-                feedback_rounds=feedback_rounds,
-                workspace=workspace,
-            )
-            print(f"Trace: {trace._path}")
-        except Exception as exc:  # noqa: BLE001
-            print(f"WARNING: failed to open trace ({type(exc).__name__}: {exc}); continuing without it", file=sys.stderr)
-            trace = None
 
     planner_llm = init_chat_model(model=model_name)
     executor_llm = init_chat_model(model=model_name)
@@ -286,7 +249,8 @@ def main(
 
         print("\n=== FINAL ===")
         print(last_summary)
-        print(f"\nWorkspace: {workspace_path.resolve()}")
+        print(f"\nWorkspace: {Path(workspace_path).resolve()}")
+        return last_summary
 
     except KeyboardInterrupt:
         if trace:
@@ -304,6 +268,80 @@ def main(
                 pass
             trace.mark_errored(exc)
         raise
+
+
+def main(
+    config_path: str,
+    cli_model: str | None,
+    workspace_override: str | None,
+    *,
+    trace_enabled: bool = True,
+    experiments_dir=None,
+):
+    """YAML-config CLI wrapper around ``run_feedback_loop``."""
+    cfg = load_config(config_path)
+
+    problem = getattr(cfg, "problem", None)
+    if not problem:
+        raise ValueError("config.yaml must contain a top-level 'problem:' string")
+
+    scorer_dotted = getattr(cfg, "scorer", None)
+    scorer_kwargs = getattr(cfg, "scorer_kwargs", None) or {}
+    expected_artifacts = getattr(cfg, "expected_artifacts", None)
+
+    model_name = (
+        cli_model
+        or getattr(cfg, "model", None)
+        or "openai:gpt-5-mini"
+    )
+    print(f"\nUsing model: {model_name}")
+
+    workspace_path = resolve_workspace(
+        workspace_override
+        or getattr(cfg, "workspace", None)
+        or "mini_workspace"
+    )
+    workspace_path.mkdir(parents=True, exist_ok=True)
+
+    # URSA only supports a single symlinkdir dict; we materialize the YAML's
+    # `symlinks:` list ourselves and pass None to URSA to skip its broken path.
+    symlink_entries = getattr(cfg, "symlinks", None) or getattr(cfg, "symlink", None)
+    if isinstance(symlink_entries, dict):
+        symlink_entries = [symlink_entries]
+    materialize_symlinks(workspace_path, symlink_entries)
+
+    feedback_rounds = max(1, int(getattr(cfg, "feedback_rounds", 2)))
+    validate_after = getattr(cfg, "validate_after", False)
+
+    # Structured trace for DSPy integration. All trace I/O is best-effort
+    # inside RunTrace.save() — failures will not abort the run.
+    trace: RunTrace | None = None
+    if trace_enabled:
+        try:
+            target_dir = experiments_dir if experiments_dir is not None else DEFAULT_EXPERIMENTS_DIR
+            trace = RunTrace.open(
+                experiments_dir=target_dir,
+                prompt_path=REPO_ROOT / config_path if not str(config_path).startswith("/") else config_path,
+                model=model_name,
+                feedback_rounds=feedback_rounds,
+                workspace=str(workspace_path),
+            )
+            print(f"Trace: {trace._path}")
+        except Exception as exc:  # noqa: BLE001
+            print(f"WARNING: failed to open trace ({type(exc).__name__}: {exc}); continuing without it", file=sys.stderr)
+            trace = None
+
+    return run_feedback_loop(
+        problem=problem,
+        workspace_path=workspace_path,
+        model_name=model_name,
+        feedback_rounds=feedback_rounds,
+        validate_after=validate_after,
+        trace=trace,
+        expected_artifacts=expected_artifacts,
+        scorer_dotted=scorer_dotted,
+        scorer_kwargs=scorer_kwargs,
+    )
 
 
 if __name__ == "__main__":

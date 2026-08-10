@@ -20,7 +20,8 @@ If no repo is detected, every script enters read-only advisory mode and exits 0 
 | `run_agent.py` | `--prompt NAME [--model M] [--workspace W] [--no-trace] [--max-iterations N]` | dispatches to `plan_execute[_feedback]` or `meta_loop` per name |
 | `probe_feasible.py` | `[--out JSON]` | `tools/probe_feasible_box.py` |
 | `eval_surrogate.py` | `[--workspace PATH] [--out DIR]` | `tools/eval_surrogate.py` |
-| `run_full_pipeline.py` | `[--model M] [--regen-dataset] [--skip-phase2] [--skip-eval] [--skip-report] [--enable-meta]` | `tools/run_full_pipeline.py` |
+| `run_full_pipeline.py` | `[--level {L0,L1}] [--model M] [--regen-dataset] [--n-samples N] [--time-budget S] [--skip-phase2] [--skip-eval] [--skip-report] [--enable-meta]` | `python -m autotokamak.pipelines phase1` → `phase2`/`meta` → `tools/eval_surrogate.py` → `tools/trace_to_html.py` |
+| `run_benchmark.py` | `--task PATH --harness {echo,ursa,dspy,claude_sdk,pi,cursor} [--model M] [--tag T] [--dry-run]` | `python -m autotokamak.bench run` (L2/L3 agent-codegen conditions; see `benchmarks/README.md`) |
 | `trace_to_html.py` | `[--experiments DIR] [--logs DIR] [--out DIR]` | `tools/trace_to_html.py` (light-theme, run index) |
 | `report.py` | `[--run-id ID \| --workspace PATH \| --trace PATH \| --latest] [--out HTML]` | (self) — dark-mode, single-run rich report with data viz, gates, winner rationale, model comparison, eval gallery, agent reasoning |
 

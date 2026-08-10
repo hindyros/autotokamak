@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Evaluate a trained surrogate: 7 diagnostic PNGs + JSON metrics.
 
 Wraps tools/eval_surrogate.py. Reads <workspace>/dataset.h5,

@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """DSPy module wrapping the meta-action-picker signature.
 
 The module's predict step is what GEPA mutates: the signature docstring
@@ -17,11 +18,25 @@ import dspy
 
 from autotokamak.agent.dspy.signatures import MetaActionPicker, SearchRoundPicker
 from autotokamak.agent.orchestrator.schema import (
+    VALID_ACQUISITION_STRATEGIES,
+    VALID_ACTIONS,
     ActionDecision,
+    EnrichActivePayload,
     ExtendSearchFocus,
     RegenDatasetOverrides,
     TerminateReason,
 )
+
+
+def _clamp_num(value: Any, lo: float, hi: float, default: float, cast=int):
+    """Coerce a numeric LLM payload value into [lo, hi]; junk -> ``default``.
+
+    bools are rejected (isinstance(True, int) is True in Python, and an LM
+    emitting ``true`` for a count is junk, not 1).
+    """
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return cast(max(lo, min(hi, value)))
+    return default
 
 
 class MetaActionPickerModule(dspy.Module):
@@ -71,12 +86,21 @@ class MetaActionPickerModule(dspy.Module):
 
 
 def _coerce_to_action_decision(pred: dspy.Prediction) -> ActionDecision:
+    """Coerce a raw prediction into a valid ``ActionDecision``.
+
+    Fallback ladder: out-of-vocabulary action -> terminate; unparseable
+    payload_json -> empty payload (schema defaults); per-action payload
+    repair (clamp numerics, filter model names to the zoo, default unknown
+    strategies to "auto"); any remaining validation failure -> terminate.
+    The meta-loop must never crash on a messy LM output — the scorer marks
+    the iteration as low-quality instead.
+    """
     action = str(getattr(pred, "action", "")).strip()
     diagnosis = str(getattr(pred, "diagnosis", ""))
     rationale = str(getattr(pred, "rationale", ""))
     payload_json = str(getattr(pred, "payload_json", "{}") or "{}")
 
-    if action not in {"regen_dataset", "extend_search", "terminate"}:
+    if action not in VALID_ACTIONS:
         # LM emitted something out-of-vocabulary; fall back to terminate so
         # the meta-loop ends cleanly rather than dispatching garbage.
         return ActionDecision.model_validate(
@@ -102,6 +126,7 @@ def _coerce_to_action_decision(pred: dspy.Prediction) -> ActionDecision:
         "action": action,
         "diagnosis": diagnosis,
         "regen": None,
+        "enrich": None,
         "extend": None,
         "terminate": None,
     }
@@ -119,6 +144,20 @@ def _coerce_to_action_decision(pred: dspy.Prediction) -> ActionDecision:
                     "rationale": rationale or payload.get("rationale", ""),
                 }
             ).model_dump()
+        elif action == "enrich_active":
+            strategy = payload.get("strategy")
+            if strategy not in VALID_ACQUISITION_STRATEGIES:
+                strategy = "auto"  # unknown/omitted -> let the system decide
+            feas = payload.get("feasibility_weighting")
+            raw["enrich"] = EnrichActivePayload.model_validate(
+                {
+                    "n_new": _clamp_num(payload.get("n_new"), 1, 2000, default=100),
+                    "beta": _clamp_num(payload.get("beta"), 0.0, 3.0, default=1.0, cast=float),
+                    "strategy": strategy,
+                    "feasibility_weighting": feas if isinstance(feas, bool) else True,
+                    "rationale": rationale or payload.get("rationale", ""),
+                }
+            ).model_dump()
         elif action == "extend_search":
             models_raw = payload.get("models_to_emphasize", []) or []
             if not isinstance(models_raw, list):
@@ -128,11 +167,7 @@ def _coerce_to_action_decision(pred: dspy.Prediction) -> ActionDecision:
             if not isinstance(widen_raw, list):
                 widen_raw = []
             widen_clean = [str(w) for w in widen_raw if isinstance(w, (str, int, float))]
-            n_hint = payload.get("n_trials_hint")
-            if isinstance(n_hint, (int, float)):
-                n_hint = max(1, min(200, int(n_hint)))
-            else:
-                n_hint = None
+            n_hint = _clamp_num(payload.get("n_trials_hint"), 1, 200, default=None)
             raw["extend"] = ExtendSearchFocus.model_validate(
                 {
                     "models_to_emphasize": models_clean,
@@ -270,11 +305,7 @@ def _coerce_to_round_decision(pred: dspy.Prediction):
         name = entry.get("name")
         if name not in MODEL_KINDS:
             continue
-        n_trials = entry.get("n_trials")
-        if isinstance(n_trials, (int, float)):
-            n_trials = max(1, min(200, int(n_trials)))
-        else:
-            n_trials = 8
+        n_trials = _clamp_num(entry.get("n_trials"), 1, 200, default=8)
         defaults = DEFAULT_SEARCH_SPACES[name]
         raw_space = entry.get("search_space")
         if not isinstance(raw_space, dict):
@@ -292,11 +323,7 @@ def _coerce_to_round_decision(pred: dspy.Prediction):
         models = _default_round_models()
         rationale = (rationale + " " if rationale else "") + "(fell back to default round)"
 
-    n_pca = getattr(pred, "n_pca_components", None)
-    if isinstance(n_pca, (int, float)) and not isinstance(n_pca, bool):
-        n_pca = max(1, min(64, int(n_pca)))
-    else:
-        n_pca = None
+    n_pca = _clamp_num(getattr(pred, "n_pca_components", None), 1, 64, default=None)
 
     try:
         return RoundDecision.model_validate(

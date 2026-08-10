@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Reference entry point for a new autotokamak example workspace.
 
 Structure follows examples/config_driven_equilibrium/run_equilibrium_from_config.py:

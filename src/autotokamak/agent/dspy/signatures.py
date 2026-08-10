@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """DSPy signatures for the meta-agent's optimizable LLM calls.
 
 The signature's **docstring** is the prompt GEPA mutates. The fields are
@@ -38,10 +39,37 @@ class MetaActionPicker(dspy.Signature):
         shrinks. ``sampling.n_samples`` in the overrides is the number of
         NEW samples to add on top of the existing corpus, not a replacement
         total. Prefer values that meaningfully enrich (e.g. +200 or +500 on
-        top of ~500). Choose this action when diagnostics indicate the
-        surrogate is sample-bottlenecked: learning_curve slope is steeply
-        negative, plateau_detected is false, or cross_seed_variance is high
-        (split-luck dominates -> need more data).
+        top of ~500). Samples are placed BLINDLY (Latin hypercube). Choose
+        this over enrich_active ONLY when you also need to CHANGE the sweep
+        configuration — widen parameter bounds, change mesh_dx/solver knobs,
+        or switch the sampling design via "sampling.method"
+        ("lhs" | "sobol" | "uniform"; sobol gives the most uniform coverage
+        of a wide box, uniform is plain random) — because those overrides are
+        this action's real lever.
+
+      - enrich_active: append new samples selected by ACTIVE LEARNING
+        instead of blindly. Once a winner exists, acquisition is
+        RESIDUAL-DRIVEN: an error model fit on the winner's out-of-fold
+        residuals scores a candidate pool by UCB (predicted |error| +
+        beta * error-model uncertainty), down-weighted where prior solves
+        FAILED — the batch lands where the model is MEASURABLY weak.
+        Before any winner exists it degrades to a pure-uncertainty PCA-GP
+        acquisition. Payload: {"n_new": int, "beta": float in [0, 3]}.
+        beta ~ 0.5 exploits known-weak regions (use when residual_structure
+        shows |residual| correlating with specific inputs); beta ~ 1-2
+        explores toward unsampled regions (use when the target envelope is
+        wider than current data coverage). You may also set "strategy":
+        "auto" (default — residual-driven if a winner exists, else
+        uncertainty), "residual_ucb" (force weakness-targeting),
+        "uncertainty" (model-agnostic field variance — use when the winner is
+        fresh and its residuals are noisy), or "space_filling" (pure maximin
+        coverage, no error model — use to blanket a newly-widened region
+        before targeting within it). PREFER this over regen_dataset
+        whenever diagnostics indicate the surrogate is sample-bottlenecked:
+        learning_curve slope steeply negative, plateau_detected false, or
+        cross_seed_variance high (split-luck dominates -> need more data).
+        Targeted samples buy more RMSE reduction per OFT solve than blind
+        ones.
 
       - extend_search: run another Phase-2 surrogate search. Specify
         models_to_emphasize, widen_params, and an optional n_trials_hint.
@@ -74,8 +102,8 @@ class MetaActionPicker(dspy.Signature):
         desc="JSON-encoded current iteration index and prior RMSE."
     )
 
-    action: Literal["regen_dataset", "extend_search", "terminate"] = dspy.OutputField(
-        desc="Exactly one of: regen_dataset, extend_search, terminate."
+    action: Literal["regen_dataset", "enrich_active", "extend_search", "terminate"] = dspy.OutputField(
+        desc="Exactly one of: regen_dataset, enrich_active, extend_search, terminate."
     )
     diagnosis: str = dspy.OutputField(
         desc="One-sentence bottleneck diagnosis."
@@ -87,10 +115,16 @@ class MetaActionPicker(dspy.Signature):
         desc='JSON object with action-specific fields. '
              'For regen_dataset: {"overrides": {<dotted SweepConfig key>: value}} — '
              'valid keys are existing SweepConfig paths only, e.g. '
-             '"sampling.n_samples", "sampling.seed", "parameters.r0.low", '
+             '"sampling.n_samples", "sampling.seed", "sampling.method" '
+             '("lhs"|"sobol"|"uniform"), "parameters.r0.low", '
              '"parameters.kappa.high", "fixed.mesh_dx". Do NOT invent knobs '
              '(no "sampling.strategy", no "sampling.focus_vars"); unknown keys '
              'are dropped. '
+             'For enrich_active: {"n_new": int, "beta": float in [0,3] '
+             '(UCB exploration weight, default 1.0), "strategy": '
+             '"auto"|"residual_ucb"|"uncertainty"|"space_filling" '
+             '(default "auto")} (optionally '
+             '"feasibility_weighting": bool, default true). '
              'For extend_search: {"models_to_emphasize": [...], "widen_params": [...], "n_trials_hint": int}. '
              'For terminate: {"reason": "...", "confidence": "low"|"medium"|"high"}.'
     )

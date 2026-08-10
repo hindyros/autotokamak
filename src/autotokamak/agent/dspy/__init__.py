@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """DSPy integration for the autotokamak agent stack.
 
 See `docs/dspy_integration_plan.md` for the proposal.

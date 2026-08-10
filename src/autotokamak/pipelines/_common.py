@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Shared utilities for all pipeline dispatchers."""
 from __future__ import annotations
 
@@ -29,25 +30,32 @@ WORKSPACE: dict[str, str] = {
     "meta":   "surrogate_meta",
 }
 
-MODES = ("fast", "ursa")
+# Access levels the pre-written pipeline supports. L0 = scripted decisions
+# (no LLM, reproducible); L1 = LLM-typed decisions via the DSPy pickers.
+# L2/L3 (agent-written code) live in `python -m autotokamak.bench`, not here.
+LEVELS = ("L0", "L1")
+
+# Condition name recorded in the manifest: <level>-<decision substrate>.
+CONDITION = {"L0": "L0-none", "L1": "L1-dspy"}
 
 
-def resolve_output_dir(pipeline: str, mode: str) -> Path:
-    """Return examples/<workspace>/<mode>/ — created if absent."""
+def resolve_output_dir(pipeline: str, level: str) -> Path:
+    """Return examples/<workspace>/<level>/ — created if absent."""
     if pipeline not in WORKSPACE:
         raise ValueError(f"Unknown pipeline {pipeline!r}. Choose from {list(WORKSPACE)}")
-    if mode not in MODES:
-        raise ValueError(f"Unknown mode {mode!r}. Choose from {MODES}")
-    d = REPO_ROOT / "examples" / WORKSPACE[pipeline] / mode
+    if level not in LEVELS:
+        raise ValueError(f"Unknown level {level!r}. Choose from {LEVELS}")
+    d = REPO_ROOT / "examples" / WORKSPACE[pipeline] / level
     d.mkdir(parents=True, exist_ok=True)
     return d
 
 
-def write_manifest(out_dir: Path, *, pipeline: str, mode: str, **kwargs: Any) -> Path:
+def write_manifest(out_dir: Path, *, pipeline: str, level: str, **kwargs: Any) -> Path:
     """Write out_dir/manifest.json and return its path."""
     manifest = {
         "pipeline": pipeline,
-        "mode": mode,
+        "level": level,
+        "condition": CONDITION.get(level, level),
         "run_id": _dt.datetime.now(_dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ"),
         "output_dir": str(out_dir),
         **kwargs,
@@ -57,9 +65,9 @@ def write_manifest(out_dir: Path, *, pipeline: str, mode: str, **kwargs: Any) ->
     return p
 
 
-def default_dataset_path(mode: str = "fast") -> Path:
-    """Canonical dataset.h5 produced by phase1 --mode <mode>."""
-    return REPO_ROOT / "examples" / "dataset_generation" / mode / "outputs" / "dataset.h5"
+def default_dataset_path(level: str = "L0") -> Path:
+    """Canonical dataset.h5 produced by phase1 --level <level>."""
+    return REPO_ROOT / "examples" / "dataset_generation" / level / "outputs" / "dataset.h5"
 
 
 def default_dataset_config() -> Path:

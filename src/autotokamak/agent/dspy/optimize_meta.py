@@ -1,8 +1,9 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """GEPA optimization CLI for the meta-action-picker prompt.
 
 Usage::
 
-    PYTHONPATH=src/autotokamak python -m autotokamak.agent.dspy.optimize_meta \
+    python -m autotokamak.agent.dspy.optimize_meta \
         --experiments-dir experiments/ \
         --output src/autotokamak/agent/dspy/optimized/meta_picker.json \
         --auto medium

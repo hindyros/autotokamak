@@ -1,0 +1,14 @@
+{
+  "action": "enrich_active",
+  "regen": null,
+  "enrich": {
+    "n_new": 160,
+    "strategy": "residual_ucb",
+    "beta": 0.6,
+    "feasibility_weighting": true,
+    "rationale": "Residual-UCB active enrichment will directly add samples in the model’s empirically weak regions, giving the best chance of reducing RMSE toward the target per new solve."
+  },
+  "extend": null,
+  "terminate": null,
+  "diagnosis": "The surrogate remains sample-bottlenecked with strongly input-correlated residual structure (r0/a/kappa/delta/Ip) while split variance is low, indicating missing coverage in specific regions rather than tuning noise."
+}

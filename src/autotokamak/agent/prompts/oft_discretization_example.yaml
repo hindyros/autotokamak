@@ -70,7 +70,7 @@ problem: |
   CONSTRAINTS:
     * Do NOT write into ./ursa/ or ./OpenFUSIONToolkit/; treat them as read-only.
     * Do not use the 'git' command.
-    * Do not modify the Python environment; use only packages from requirements.txt.
+    * Do not modify the Python environment; use only packages already installed in the venv (see pyproject.toml).
     * OpenFUSIONToolkit binary and PYTHONPATH are already set up; do not validate or reinstall.
     * Do not prompt the user for input; the task is autonomous.
     * You may search the web only for OFT/TokaMaker API or relevant physics if needed.

@@ -3,7 +3,7 @@
 # Run with the venv activated and .env loaded:
 #   set -a && source .env && set +a
 #   source venv/bin/activate
-#   PYTHONPATH=src/autotokamak python -m agent.runners.plan_execute_feedback \
+#   python -m autotokamak.agent.runners.plan_execute_feedback \
 #       --config src/autotokamak/agent/prompts/surrogate_automl.yaml
 #
 # Scope: pick the best classical surrogate for psi(R,Z) from a four-model
@@ -38,7 +38,7 @@ problem: |
 
   API REFERENCE (the only calls you should make into the library)
 
-    # autotokamak.eval.data
+    # autotokamak.surrogate.dataset
     load_dataset(h5_path) -> DatasetBundle
             # Fields: inputs (N,5), psi (N,nz,nr), R, Z, source_path.
             # Already filtered to success=True rows.
@@ -47,12 +47,12 @@ problem: |
             # USE THE SAME seed as in surrogate_config.yaml so the scorer
             # reproduces the same partitioning.
 
-    # autotokamak.eval.reduce
+    # autotokamak.surrogate.reduce
     fit_pca(psi_train, n_components) -> PCAModel
     transform(pca, psi)            -> coeffs (N, n_components)
     inverse_transform(pca, coeffs) -> psi (N, nz, nr)
 
-    # autotokamak.eval.metrics
+    # autotokamak.surrogate.metrics
     psi_rmse(true, pred, mask=None)            -> float
     relative_l2(true, pred, mask=None)         -> float
     baseline_mean_predictor_rmse(psi_tr, psi_va) -> float
@@ -66,7 +66,7 @@ problem: |
             # Dispatch by name. ENFORCES MLP caps: len(hidden_layer_sizes)<=2,
             # each layer<=256. Hallucinating bigger nets raises ValueError.
 
-    # autotokamak.surrogate.automl
+    # autotokamak.surrogate.optuna_search
     run_study(spec, *, bundle, splits, workdir) -> StudyResult
             # spec is a SearchSpec (see SCHEMA below). One Optuna study per
             # model written to <workdir>/study.db; resumable with load_if_exists.
@@ -128,9 +128,9 @@ problem: |
   DELIVERABLES (exactly five files, written in the current directory)
     1. `surrogate_config.yaml` — see CONFIG-FILE SCHEMAS above.
     2. `run_surrogate_automl.py` — the runner. Takes the config path as its
-       sole CLI arg. Imports from `autotokamak.eval` and
-       `autotokamak.surrogate`. Do NOT import torch; do NOT import
-       sklearn.neural_network directly (use `surrogate.zoo.make_model`).
+       sole CLI arg. Imports from `autotokamak.surrogate` (dataset,
+       reduce, metrics, zoo, optuna_search). Do NOT import torch; do NOT
+       import sklearn.neural_network directly (use `surrogate.zoo.make_model`).
        Steps:
          - load config (use `SurrogateConfig.from_yaml`)
          - load dataset + build splits with the config's seed
@@ -233,7 +233,7 @@ problem: |
     * Do not prompt for user input; the task is autonomous.
     * Do not import torch, tensorflow, or any deep-learning library.
       The zoo is sklearn-only by design.
-    * REUSE `autotokamak.eval` and `autotokamak.surrogate` — do NOT
+    * REUSE `autotokamak.surrogate` (dataset, reduce, metrics, zoo, optuna_search) — do NOT
       reimplement PCA, k-fold splits, Optuna objectives, or the model
       factories. Calling `make_model` is mandatory; instantiating
       `MLPRegressor` directly is graded down.

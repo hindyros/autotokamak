@@ -1,6 +1,6 @@
 sampling:
   method: "lhs"
-  n_samples: 500
+  n_samples: 2000
   seed: 0
 
 parameters:

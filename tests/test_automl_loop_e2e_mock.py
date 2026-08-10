@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """End-to-end tests for the structured AutoML loop with a scripted decision_fn.
 
 No LLM: decisions are supplied by plain functions, mirroring how
@@ -85,8 +86,8 @@ def test_automl_loop_run_then_terminate(tmp_path: Path):
     # Winner predicts shard-shaped output.
     import joblib
 
-    from autotokamak.surrogate.automl import predict_with_winner
-    from autotokamak.eval.data import load_dataset
+    from autotokamak.surrogate.optuna_search import predict_with_winner
+    from autotokamak.surrogate.dataset import load_dataset
 
     payload = joblib.load(outputs / "winner.pkl")
     shard_bundle = load_dataset(shard)

@@ -37,9 +37,12 @@ notes/
 # Run outputs (generated, never commit)
 outputs/
 
-# Pipeline mode outputs — examples/<workspace>/fast/ and ursa/ are live run artifacts
+# Pipeline level outputs — examples/<workspace>/<level>/ are live run artifacts
 examples/*/fast/
 examples/*/ursa/
+examples/*/L0/
+examples/*/L1/
+examples/*/L2-*/
 
 # URSA runtime scratch (created inside agent workspaces)
 graph_store.sqlite
@@ -48,14 +51,27 @@ ursa_metrics/
 # Agent-run logs
 logs/
 
-# ML data and model artifacts (generated; track structure via .gitkeep only)
-data/raw/*
-!data/raw/.gitkeep
-data/processed/*
-!data/processed/.gitkeep
-models/checkpoints/*
-!models/checkpoints/.gitkeep
+# Per-run experiment artifacts (generated; track structure via .gitkeep only)
 experiments/*
 !experiments/.gitkeep
+
+# Heavy run artifacts inside example workspaces (stay on disk, never commit)
+examples/**/*.h5
+examples/**/*.pkl
+examples/surrogate_meta/datasets/
+examples/surrogate_meta/iterations/
+examples/surrogate_meta/refits/
+examples/surrogate_meta/surrogate_runs/
+examples/surrogate_meta/meta_trace.json
+examples/surrogate_meta/report.json
+
+# Notebook run outputs
+notebooks/manual_surrogate_run/
+notebooks/scaling_runs/
 .claude/scheduled_tasks.lock
 .claude/settings.local.json
+
+# Benchmark run artifacts (generated at run time; heavy assets stay on disk).
+# reference_runs/ READMEs are tracked; the agent-generated workspaces are not.
+benchmarks/assets/*.h5
+benchmarks/reference_runs/*/workspace/

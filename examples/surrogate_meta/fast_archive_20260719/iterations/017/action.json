@@ -1,0 +1,14 @@
+{
+  "action": "enrich_active",
+  "regen": null,
+  "enrich": {
+    "n_new": 120,
+    "strategy": "residual_ucb",
+    "beta": 0.6,
+    "feasibility_weighting": true,
+    "rationale": "Residual-UCB active learning will concentrate new simulations where the current winner demonstrably underperforms, maximizing RMSE reduction per added sample to close the small remaining gap to the target."
+  },
+  "extend": null,
+  "terminate": null,
+  "diagnosis": "Residuals remain structured and strongly correlated with key inputs (r0, a, kappa, delta, Ip) while the learning curve is still improving and split variance is low, indicating a sample-coverage bottleneck in specific regions."
+}

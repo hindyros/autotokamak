@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Pydantic v2 config models for equilibrium runs.
 
 Replaces the ad-hoc ``_m``, ``_req``, ``_num``, ``_int`` helpers in the
@@ -5,9 +6,10 @@ config-driven runner with a typed schema. Benefits:
 
 - IDE autocomplete on config fields
 - Field-level error messages instead of generic ``Missing required key``
-- One schema covers the basic equilibrium, sweep, and inversion YAMLs
-  via composition (avoids the pre-refactor YAML-schema divergence)
 - ``model_dump()`` round-trips to a clean dict for hashing / provenance
+
+Dataset-sweep configs have their own schema in :mod:`autotokamak.data.schema`
+(``SweepConfig``); this module only covers a single equilibrium run.
 
 Usage::
 
@@ -139,63 +141,14 @@ class EquilibriumConfig(BaseModel):
         return cls.model_validate(raw)
 
 
-# ----------------------------- composed schemas ----------------------------- #
-
-class CaseOverride(BaseModel):
-    """One case in a discretization sweep — name + arbitrary override dict."""
-
-    model_config = ConfigDict(extra="allow")
-    name: str
-    overrides: Dict[str, Any] = Field(default_factory=dict)
-
-
-class SweepConfig(BaseModel):
-    """A discretization sweep: base config + list of per-case overrides."""
-
-    model_config = ConfigDict(extra="allow")
-    base_config: EquilibriumConfig
-    cases: List[CaseOverride] = Field(min_length=1)
-
-    @classmethod
-    def from_yaml(cls, path: str | Path) -> "SweepConfig":
-        with open(path, "r", encoding="utf-8") as f:
-            raw = yaml.safe_load(f)
-        return cls.model_validate(raw)
-
-
-class InvertOptimize(BaseModel):
-    model_config = ConfigDict(extra="allow")
-    psi_loss: Optional[str] = None
-    regularization_lambda: Optional[float] = None
-
-
-class InvertConfig(BaseModel):
-    """ψ inversion: base equilibrium + target ψ + optimization knobs."""
-
-    model_config = ConfigDict(extra="allow")
-    base_config: EquilibriumConfig
-    target: Dict[str, Any]
-    optimize: InvertOptimize = Field(default_factory=InvertOptimize)
-
-    @classmethod
-    def from_yaml(cls, path: str | Path) -> "InvertConfig":
-        with open(path, "r", encoding="utf-8") as f:
-            raw = yaml.safe_load(f)
-        return cls.model_validate(raw)
-
-
 __all__ = [
     "BoundaryConfig",
-    "CaseOverride",
     "EquationConfig",
     "EquilibriumConfig",
     "InitPsiConfig",
-    "InvertConfig",
-    "InvertOptimize",
     "MeshConfig",
     "MeshRegion",
     "OutputsConfig",
     "SolverConfig",
-    "SweepConfig",
     "TargetsConfig",
 ]

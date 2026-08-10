@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Shared repo-locate + env-header helpers for autotokamak Skill scripts.
 
 Every Skill wrapper imports from this module. The wrappers themselves never
@@ -78,12 +79,12 @@ def repo_python(root: Path) -> str:
 
 
 def agent_env(root: Path) -> dict:
-    """PYTHONPATH- and PATH-injected env for runners under agent.runners.*.
+    """PYTHONPATH- and PATH-injected env for runners under autotokamak.agent.runners.*.
 
     Two things must happen for the nested ExecutionAgent to find autotokamak:
 
-      1. PYTHONPATH → src/autotokamak so the runners import as
-         `agent.runners.plan_execute_feedback` (not autotokamak.agent.runners.*).
+      1. PYTHONPATH → <root>/src so `import autotokamak` works even when the
+         package is not pip-installed in the active interpreter.
       2. PATH prepended with <root>/venv/bin so when the ExecutionAgent's
          shell tool runs `python3 -c "import autotokamak"`, `python3`
          resolves to the venv's interpreter (which has autotokamak
@@ -93,7 +94,7 @@ def agent_env(root: Path) -> dict:
          that is actually installed one PATH entry away.
     """
     env = os.environ.copy()
-    env["PYTHONPATH"] = str(root / "src" / "autotokamak")
+    env["PYTHONPATH"] = str(root / "src")
     venv_bin = root / "venv" / "bin"
     if venv_bin.is_dir():
         env["PATH"] = f"{venv_bin}:{env.get('PATH', '')}"

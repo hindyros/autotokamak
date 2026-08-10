@@ -5,7 +5,7 @@ This note describes **`run_invert_psi.py`**, an outer loop around the existing c
 ## Prerequisites
 
 - Same as the main discretization example: **OpenFUSIONToolkit** on `PYTHONPATH`, working TokaMaker.
-- **SciPy** (listed in the repo root `requirements.txt` for `scipy.optimize`).
+- **SciPy** (a core dependency in `pyproject.toml`, used for `scipy.optimize`).
 - Your OFT build must expose **`TokaMaker.get_psi()`** returning a one-dimensional `numpy` array (some builds wrap the array in a length-one tuple; that case is handled).
 
 ## What is being minimized? (`optimize.psi_loss`)

@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Trace-loader unit tests.
 
 Synthesizes a tiny experiments/ tree with one fake run_id directory

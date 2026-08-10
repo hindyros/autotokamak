@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# provenance: URSA-generated, then hand/Claude-refactored to route through autotokamak.core
 """
 Run a config-driven dataset sweep of fixed-boundary Grad-Shafranov equilibria
 using autotokamak.core. Writes outputs/dataset.h5 and diagnostic plots.
@@ -457,3 +458,6 @@ if __name__ == '__main__':
         if args.override:
             print('Warning: --override ignored for full run; use quick mode for non-destructive overrides')
         main(args.config)
+
+    
+    

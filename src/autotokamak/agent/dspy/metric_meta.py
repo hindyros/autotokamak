@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Composite scorer for the meta-agent loop.
 
 Mirrors ``metric_surrogate.score_surrogate_run`` shape (same ``ScoreReport``
@@ -42,8 +43,10 @@ from typing import Any
 
 import numpy as np
 
+from autotokamak.agent.orchestrator.schema import VALID_ACTIONS
+
 EXPECTED_DELIVERABLES = ("winner.pkl", "report.json", "meta_trace.json")
-EXPECTED_ACTIONS = {"regen_dataset", "extend_search", "terminate"}
+EXPECTED_ACTIONS = set(VALID_ACTIONS)
 
 WEIGHTS = {
     "final_rmse_vs_baseline": 0.35,
@@ -187,6 +190,8 @@ def score_meta_run(workspace: str | Path) -> ScoreReport:
         action = (it.get("decision", {}) or {}).get("action", "")
         total += 1
         if action == "regen_dataset" and re.search(r"\b(sample|data|N\b|coverage|fidelity|noise|mesh)", diagnosis, re.I):
+            matches += 1
+        elif action == "enrich_active" and re.search(r"\b(sample|data|coverage|uncertain|variance|active|acqui|inform)", diagnosis, re.I):
             matches += 1
         elif action == "extend_search" and re.search(r"\b(edge|range|model|hyper|widen|search|trial|tune)", diagnosis, re.I):
             matches += 1

@@ -48,6 +48,13 @@ dev = [
   "pytest-cov",
   "ruff",
 ]
+# Extra agent substrates for the benchmark matrix (src/autotokamak/harnesses/).
+# pi and cursor are npm-installed CLIs, not pip deps:
+#   npm i -g @mariozechner/pi-coding-agent   -> `pi`
+#   see cursor.com/docs/cli                  -> `cursor-agent`
+harnesses = [
+  "claude-agent-sdk>=0.1",
+]
 
 [project.urls]
 Repository = "https://github.com/hindyros/autotokamak"

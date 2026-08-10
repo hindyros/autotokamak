@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Action dispatchers invoked by the meta-loop runner.
 
 Three actions, three dispatchers. Each takes ``(payload, state)`` and
@@ -23,6 +24,7 @@ import yaml
 
 from autotokamak.agent.orchestrator.schema import (
     ActionDecision,
+    EnrichActivePayload,
     ExtendSearchFocus,
     RegenDatasetOverrides,
     TerminateReason,
@@ -54,9 +56,18 @@ class MetaState:
         "src/autotokamak/agent/prompts/surrogate_automl.yaml"
     )
     seed: int = 0
-    # Frozen held-out test shard carved from the initial dataset at meta-loop
-    # start. Never merged into, never regenerated.
+    # Frozen held-out test shard: either carved from the initial dataset at
+    # meta-loop start (legacy) or the full-envelope eval set (design doc
+    # §D2). Never merged into, never regenerated.
     test_shard_h5: Optional[Path] = None
+    # Target-envelope acquisition bounds (lows, highs) in PARAM_ORDER, set by
+    # the meta-loop when MetaConfig.eval_envelope is configured. When None,
+    # enrich_active acquires over base_sweep_config's (seed-box) bounds.
+    envelope_bounds: Optional[tuple] = None
+    # In-memory cache of the loaded frozen eval set. The file never changes
+    # during a run, so _frozen_shard_rmse loads it once instead of re-parsing
+    # the HDF5 on every winner comparison (up to 3x per iteration).
+    shard_bundle_cache: Optional[Any] = None
     # "structured" = deterministic automl_loop with typed per-round LLM
     # decisions; "codegen" = legacy nested plan_execute_feedback agent.
     phase2_mode: str = "structured"
@@ -124,8 +135,8 @@ def _refit_winner_on_pool(state: MetaState) -> Optional[Dict[str, Any]]:
     if payload is None:
         return None
     try:
-        from autotokamak.eval.data import load_dataset
-        from autotokamak.eval.reduce import fit_pca, transform
+        from autotokamak.surrogate.dataset import load_dataset
+        from autotokamak.surrogate.reduce import fit_pca, transform
         from autotokamak.surrogate.zoo import make_model
 
         bundle = load_dataset(state.current_dataset_h5)
@@ -247,6 +258,94 @@ def regen_dataset(payload: RegenDatasetOverrides, state: MetaState) -> Dict[str,
     }
 
 
+# ----------------------------- enrich_active ----------------------------- #
+
+def enrich_active(payload: EnrichActivePayload, state: MetaState) -> Dict[str, Any]:
+    """ACTIVE data enrichment: solve the points where the surrogate is weak.
+
+    Where ``regen_dataset`` appends another blind LHS batch, this action
+    asks ``data.acquire`` for a targeted batch. With a trained winner in
+    state, acquisition is RESIDUAL-DRIVEN (UCB over an error model fit on
+    the winner's out-of-fold residuals — "based on observed model
+    performance"); before any winner exists it degrades to the PCA-GP
+    variance proxy. Both are feasibility-weighted, and the batch is drawn
+    over the TARGET ENVELOPE bounds when the meta-loop configured one
+    (``state.envelope_bounds``), else over the seed sweep box. The selected
+    points go through the SAME sweep/merge/refit path as a regen, so
+    downstream consumers can't tell the difference — except, ideally, in
+    the shard RMSE.
+
+    No LLM involved: the acquisition itself is deterministic given the
+    current train pool, winner, and seed. The LLM's job is only to have
+    CHOSEN this action (and its n_new / beta knobs) over the alternatives.
+    """
+    if state.base_sweep_config is None:
+        raise RuntimeError(
+            "enrich_active requires meta_config.base_sweep_config to be set "
+            "(it supplies the sampling bounds and solver knobs)"
+        )
+    import numpy as np
+
+    from autotokamak.data.acquire import select_from_dataset
+    from autotokamak.data.schema import PARAM_ORDER
+
+    cfg = state.base_sweep_config
+    if state.envelope_bounds is not None:
+        lows, highs = (np.asarray(b, dtype=np.float64) for b in state.envelope_bounds)
+    else:
+        lows = np.array([cfg.parameters[p].low for p in PARAM_ORDER], dtype=np.float64)
+        highs = np.array([cfg.parameters[p].high for p in PARAM_ORDER], dtype=np.float64)
+
+    iter_idx = len(state.actions_taken)
+    acq = select_from_dataset(
+        state.current_dataset_h5,
+        bounds_low=lows,
+        bounds_high=highs,
+        n_points=int(payload.n_new),
+        winner_payload=state.best_winner_payload,
+        beta=float(payload.beta),
+        strategy=payload.strategy,
+        seed=int(state.seed) + iter_idx + 1,
+        # floor=1.0 makes every feasibility weight exactly 1 — weighting off.
+        # When weighting is ON we omit the kwarg so acquire.py owns its default.
+        **({} if payload.feasibility_weighting else {"feasibility_floor": 1.0}),
+    )
+
+    datasets_dir = state.workspace / "datasets"
+    datasets_dir.mkdir(parents=True, exist_ok=True)
+    sweep_cfg = cfg.model_copy(update={"output_path": f"iter{iter_idx}_active.h5"})
+    result = run_sweep(sweep_cfg, datasets_dir, X=acq.X_new)
+    (datasets_dir / f"iter{iter_idx}_acquisition.json").write_text(
+        json.dumps(acq.summary_dict(), indent=2, default=str)
+    )
+
+    # Enrich: same merge-and-grow path as regen_dataset.
+    prior_path = Path(state.current_dataset_h5)
+    new_path = Path(result.dataset_path)
+    merged_path = datasets_dir / f"iter{iter_idx}_dataset.h5"
+    merge_counts = _merge_datasets(prior_path, new_path, merged_path)
+
+    state.current_dataset_h5 = merged_path
+
+    refit_info = _refit_winner_on_pool(state) or {}
+
+    return {
+        "kind": "enrich_active",
+        **refit_info,
+        "acquisition": acq.summary_dict(),
+        "dataset_path": str(merged_path),
+        "prior_dataset_path": str(prior_path),
+        "new_shard_path": str(new_path),
+        "n_new_requested": result.n_requested,
+        "n_new_succeeded": result.n_succeeded,
+        "n_new_isoflux_used": result.n_isoflux_used,
+        "n_total": merge_counts["n_total"],
+        "n_total_succeeded": merge_counts["n_succeeded"],
+        "n_total_isoflux_used": merge_counts["n_isoflux_used"],
+        "rationale": payload.rationale,
+    }
+
+
 # ----------------------------- extend_search ----------------------------- #
 
 def _frozen_shard_rmse(winner_payload: dict, state: MetaState) -> Optional[float]:
@@ -259,11 +358,13 @@ def _frozen_shard_rmse(winner_payload: dict, state: MetaState) -> Optional[float
     if winner_payload is None or state.test_shard_h5 is None:
         return None
     try:
-        from autotokamak.eval.data import load_dataset
-        from autotokamak.eval.metrics import psi_rmse
-        from autotokamak.surrogate.automl import predict_with_winner
+        from autotokamak.surrogate.dataset import load_dataset
+        from autotokamak.surrogate.metrics import psi_rmse
+        from autotokamak.surrogate.optuna_search import predict_with_winner
 
-        shard = load_dataset(state.test_shard_h5)
+        if state.shard_bundle_cache is None:
+            state.shard_bundle_cache = load_dataset(state.test_shard_h5)
+        shard = state.shard_bundle_cache
         pred = predict_with_winner(winner_payload, shard.inputs)
         return float(psi_rmse(shard.psi, pred))
     except Exception:  # noqa: BLE001
@@ -384,7 +485,7 @@ def _extend_search_codegen(payload: ExtendSearchFocus, state: MetaState) -> Dict
 
     # Programmatic invocation. Imported lazily so the orchestrator module
     # has no hard dependency on langchain/ursa at import time.
-    from agent.runners.plan_execute_feedback import main as feedback_main
+    from autotokamak.agent.runners.plan_execute_feedback import main as feedback_main
 
     started = time.time()
     feedback_main(
@@ -493,6 +594,7 @@ def terminate(payload: TerminateReason, state: MetaState) -> Dict[str, Any]:
 
 DISPATCH = {
     "regen_dataset": regen_dataset,
+    "enrich_active": enrich_active,
     "extend_search": extend_search,
     "terminate": terminate,
 }
@@ -512,6 +614,7 @@ __all__ = [
     "DISPATCH",
     "MetaState",
     "dispatch",
+    "enrich_active",
     "extend_search",
     "regen_dataset",
     "terminate",

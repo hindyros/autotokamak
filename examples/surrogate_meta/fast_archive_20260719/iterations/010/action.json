@@ -1,0 +1,14 @@
+{
+  "action": "enrich_active",
+  "regen": null,
+  "enrich": {
+    "n_new": 200,
+    "strategy": "residual_ucb",
+    "beta": 0.6,
+    "feasibility_weighting": true,
+    "rationale": "Residual-driven active learning will preferentially add new solves where the current winner’s residuals are largest/most uncertain, improving coverage along the correlated inputs and reducing RMSE faster than another tuning-only search."
+  },
+  "extend": null,
+  "terminate": null,
+  "diagnosis": "The bottleneck is sample coverage in specific input directions (r0/a/kappa/delta/Ip) with stable generalization estimates, so error is dominated by structured residuals rather than tuning noise."
+}

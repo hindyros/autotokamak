@@ -1,0 +1,25 @@
+{
+  "kind": "extend_search",
+  "mode": "structured",
+  "sub_workspace": "/Users/hindy/Desktop/Deep Deka/autokamak/examples/surrogate_meta/fast/surrogate_runs/iter0",
+  "elapsed_seconds": 332.5294289588928,
+  "n_rounds": 3,
+  "terminated_by": "rounds_cap",
+  "nested_val_rmse": 0.0008186568791517105,
+  "shard_rmse": 0.0007628581621983295,
+  "winner_path": "/Users/hindy/Desktop/Deep Deka/autokamak/examples/surrogate_meta/fast/surrogate_runs/iter0/outputs/winner.pkl",
+  "models_emphasized": [
+    "mlp"
+  ],
+  "widen_params": [
+    "pca.n_components",
+    "model.hidden_dim",
+    "model.depth",
+    "gp.kernel",
+    "gp.lengthscale",
+    "ridge.alpha",
+    "xgb.max_depth",
+    "xgb.n_estimators"
+  ],
+  "rationale": "Running a Phase-2 surrogate search now produces an initial best model (winner.pkl) and reliable RMSE baseline, after which residual-driven active learning or dataset regeneration can be targeted effectively."
+}

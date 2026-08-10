@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# provenance: URSA-generated (URSA plan->execute agent)
 """Two-tier validation for run_fixed_boundary_equilibrium.py outputs.
 
 Tier 1 (structural)

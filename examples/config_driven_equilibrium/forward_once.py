@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# provenance: URSA-generated (URSA plan->execute agent)
 """One isolated TokaMaker forward solve: write ψ to NPZ. Used by run_invert_psi (subprocess).
 
 Usage:

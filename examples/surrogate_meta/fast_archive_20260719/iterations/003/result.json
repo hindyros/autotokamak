@@ -1,0 +1,40 @@
+{
+  "kind": "enrich_active",
+  "refit_shard_rmse": 0.0006688865581957207,
+  "refit_became_best": true,
+  "refit_path": "/Users/hindy/Desktop/Deep Deka/autokamak/examples/surrogate_meta/fast/refits/iter3.pkl",
+  "refit_n_samples": 1124,
+  "acquisition": {
+    "method": "residual_ucb",
+    "n_selected": 200,
+    "n_candidates": 4096,
+    "n_pca_components": 0,
+    "pca_explained_variance": 0.0,
+    "score_first": -7.373373167764872,
+    "score_last": -7.531295993307448,
+    "mean_feasibility": 0.8767320079888878,
+    "kernel_summaries": [
+      "3.11**2 * RBF(length_scale=[1.27, 1.42, 3.04, 4.02, 3.83]) + WhiteKernel(noise_level=0.027)"
+    ],
+    "seed": 4,
+    "notes": "Residual-UCB acquisition: 200 points from a 4096-point Sobol pool; error model = ARD-RBF GP on log OOF residuals of winner 'kernel_ridge' (924 samples, 4-fold); beta=0.6; feasibility weighting ACTIVE (floor=0.02).",
+    "beta": 0.6,
+    "residual_summary": {
+      "n_oof": 924,
+      "k_folds": 4,
+      "resid_mean": 0.0005418122413577976,
+      "resid_max": 0.001104061269614798,
+      "resid_p90": 0.0006971694290294867
+    }
+  },
+  "dataset_path": "/Users/hindy/Desktop/Deep Deka/autokamak/examples/surrogate_meta/fast/datasets/iter3_dataset.h5",
+  "prior_dataset_path": "/Users/hindy/Desktop/Deep Deka/autokamak/examples/surrogate_meta/fast/datasets/iter2_dataset.h5",
+  "new_shard_path": "/Users/hindy/Desktop/Deep Deka/autokamak/examples/surrogate_meta/fast/datasets/iter3_active.h5",
+  "n_new_requested": 200,
+  "n_new_succeeded": 200,
+  "n_new_isoflux_used": 0,
+  "n_total": 1125,
+  "n_total_succeeded": 1124,
+  "n_total_isoflux_used": 0,
+  "rationale": "Residual-driven active learning will preferentially add solves where the model\u2019s out-of-fold error is predicted highest in those correlated input regions, yielding better RMSE reduction per new sample than blind regeneration or more tuning."
+}

@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Pydantic schemas for the meta-agent: config, decisions, per-iteration records.
 
 The LLM's structured output schema is ``ActionDecision`` — the meta-loop forces
@@ -12,9 +13,19 @@ from typing import Any, Dict, List, Literal, Optional
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
+from typing import get_args
+
+from autotokamak.data.envelope import EnvelopeConfig
 
 
-ActionKind = Literal["regen_dataset", "extend_search", "terminate"]
+ActionKind = Literal["regen_dataset", "enrich_active", "extend_search", "terminate"]
+# Single source of truth for the action vocabulary — the dispatcher table,
+# DSPy coercion, meta-metric, and meta-loop all derive from this instead of
+# repeating the string set (adding an action = editing ActionKind + DISPATCH).
+VALID_ACTIONS: tuple[str, ...] = get_args(ActionKind)
+
+AcquisitionStrategy = Literal["auto", "residual_ucb", "uncertainty", "space_filling"]
+VALID_ACQUISITION_STRATEGIES: tuple[str, ...] = get_args(AcquisitionStrategy)
 
 
 class RegenDatasetOverrides(BaseModel):
@@ -28,6 +39,51 @@ class RegenDatasetOverrides(BaseModel):
 
     model_config = ConfigDict(extra="allow")
     overrides: Dict[str, Any] = Field(default_factory=dict)
+    rationale: str = ""
+
+
+class EnrichActivePayload(BaseModel):
+    """Payload for the active-learning data-enrichment action.
+
+    Unlike ``regen_dataset`` (blind LHS append), this action picks the NEW
+    sample locations on purpose. With a trained winner available, the batch
+    is selected by RESIDUAL-DRIVEN UCB: an error model fit on the winner's
+    out-of-fold residuals targets the geometries where the model is
+    measurably weak (``beta`` trades exploitation of measured weakness
+    against exploration of unvisited envelope regions). Before any winner
+    exists, a PCA-GP variance acquisition is used instead. Both are
+    feasibility-weighted. See ``autotokamak.data.acquire``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    n_new: int = Field(
+        default=500,
+        ge=1,
+        le=2000,
+        description="How many acquisition-selected samples to solve and append.",
+    )
+    strategy: AcquisitionStrategy = Field(
+        default="auto",
+        description="Which acquisition strategy to use. 'auto' = residual-driven "
+        "when a winner exists, else model-agnostic uncertainty. "
+        "'residual_ucb' = force targeting the winner's measured weakness. "
+        "'uncertainty' = model-agnostic PCA-GP field variance (use when the "
+        "winner's residuals are not yet trustworthy). 'space_filling' = pure "
+        "maximin coverage, no error model (use to blanket a new region).",
+    )
+    beta: float = Field(
+        default=1.0,
+        ge=0.0,
+        le=3.0,
+        description="UCB exploration weight for the residual-driven path: "
+        "0 = pure exploitation of measured weakness, larger = more "
+        "exploration of unsampled regions. Ignored unless strategy resolves "
+        "to residual_ucb.",
+    )
+    feasibility_weighting: bool = Field(
+        default=True,
+        description="Down-weight candidates near previously FAILED solves.",
+    )
     rationale: str = ""
 
 
@@ -66,13 +122,14 @@ class TerminateReason(BaseModel):
 class ActionDecision(BaseModel):
     """The typed JSON the meta-agent's LLM emits per iteration.
 
-    Exactly one of (``regen``, ``extend``, ``terminate``) is populated; the
-    ``action`` discriminator selects which.
+    Exactly one of (``regen``, ``enrich``, ``extend``, ``terminate``) is
+    populated; the ``action`` discriminator selects which.
     """
 
     model_config = ConfigDict(extra="forbid")
     action: ActionKind
     regen: Optional[RegenDatasetOverrides] = None
+    enrich: Optional[EnrichActivePayload] = None
     extend: Optional[ExtendSearchFocus] = None
     terminate: Optional[TerminateReason] = None
     diagnosis: str = Field(
@@ -82,6 +139,7 @@ class ActionDecision(BaseModel):
 
     def selected_payload(self) -> BaseModel | None:
         return {"regen_dataset": self.regen,
+                "enrich_active": self.enrich,
                 "extend_search": self.extend,
                 "terminate": self.terminate}[self.action]
 
@@ -111,14 +169,35 @@ class MetaConfig(BaseModel):
         "legacy nested plan_execute_feedback agent.",
     )
     phase2_max_rounds: int = Field(default=3, ge=1, le=10)
+    enrich_n_new: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=2000,
+        description="When set, force every enrich_active action to acquire "
+        "exactly this many samples (experiment control; overrides the "
+        "picker's chosen n_new).",
+    )
     holdout_test_frac: float = Field(
         default=0.15,
         gt=0.0,
         lt=0.5,
         description="Fraction of the initial dataset's successful samples frozen "
-        "into the held-out test shard at meta-loop start.",
+        "into the held-out test shard at meta-loop start. IGNORED when "
+        "``eval_envelope`` is set (the envelope eval set replaces the shard "
+        "and the whole initial dataset becomes train pool).",
     )
     holdout_min_test: int = Field(default=2, ge=1)
+    # Full-envelope evaluation set (design doc §D2). When set, the frozen
+    # eval samples cover the TARGET envelope (possibly wider than the seed
+    # sweep box) instead of being carved from the seed dataset — required
+    # for honest measurement once enrich_active samples new geometries.
+    # Acquisition bounds for enrich_active follow the envelope too.
+    eval_envelope: Optional["EnvelopeConfig"] = Field(
+        default=None,
+        description="Envelope eval-set spec: either {'h5': path} for a "
+        "pre-solved set, or generation knobs (n_eval, parameters, seed). "
+        "None = legacy seed-shard behavior.",
+    )
     # Early-stopping quality bar (both optional; loop stops when EITHER is
     # met by the frozen-shard RMSE; max_iterations remains the safety net
     # for unreachable targets):
@@ -133,6 +212,31 @@ class MetaConfig(BaseModel):
         le=1.0,
         description="Relative target: stop when shard RMSE <= ratio * baseline "
         "(mean-predictor) RMSE. Scale-free, so it survives dataset changes.",
+    )
+    target_accuracy_pct: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        lt=100.0,
+        description="Performance stop, phrased as accuracy: stop as soon as the "
+        "winner is at least this percent better than the trivial baseline "
+        "mean-predictor on the frozen eval set, i.e. error reduction "
+        "100*(1 - rmse/baseline) >= target. 90 => stop at 90% error reduction "
+        "(equivalently target_rmse_ratio = 0.10). Scale-free. When several "
+        "targets are set the STRICTEST (lowest-RMSE) one wins; max_iterations "
+        "remains the safety cap for unreachable targets.",
+    )
+    target_worst_cell_accuracy_pct: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        lt=100.0,
+        description="Performance stop on the WEAKEST geometry region: stop only "
+        "once EVERY occupied eval cell is at least this percent better than the "
+        "baseline mean-predictor IN THAT CELL, i.e. "
+        "min_cells 100*(1 - cell_rmse/cell_baseline) >= target. Uses each "
+        "cell's own baseline so a large-psi region is not penalized for its "
+        "scale. Stricter than target_accuracy_pct (which gates only the "
+        "aggregate) and requires eval_envelope for per-cell scoring. "
+        "max_iterations remains the cap.",
     )
     seed: int = 0
     workspace: str = "examples/surrogate_meta"
@@ -174,6 +278,18 @@ class MetaReport(BaseModel):
     # per-iteration rmse_history) are measured on the SAME frozen test shard.
     final_rmse: Optional[float] = Field(default=None, ge=0.0)
     baseline_rmse: float = Field(ge=0.0)
+    # Performance stop, phrased as accuracy (error reduction vs baseline
+    # mean-predictor). target_accuracy_pct is the requested bar (None if
+    # unset); final_accuracy_pct is what the winner actually achieved.
+    target_accuracy_pct: Optional[float] = None
+    final_accuracy_pct: Optional[float] = None
+    # Same, but for the WEAKEST geometry cell (envelope mode only).
+    target_worst_cell_accuracy_pct: Optional[float] = None
+    final_worst_cell_accuracy_pct: Optional[float] = None
+    # Which eval-set mode the run used, and (envelope mode) the winner's
+    # per-geometry-cell breakdown from surrogate.metrics.per_cell_errors.
+    eval_mode: Optional[Literal["envelope", "seed_shard"]] = None
+    eval_per_cell: Optional[Dict[str, Any]] = None
     test_shard_path: Optional[str] = None
     n_test_samples: Optional[int] = None
     n_train_pool_samples: Optional[int] = None
@@ -184,8 +300,12 @@ class MetaReport(BaseModel):
 
 
 __all__ = [
+    "AcquisitionStrategy",
     "ActionDecision",
     "ActionKind",
+    "VALID_ACQUISITION_STRATEGIES",
+    "VALID_ACTIONS",
+    "EnrichActivePayload",
     "ExtendSearchFocus",
     "MetaConfig",
     "MetaIterationRecord",

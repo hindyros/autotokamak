@@ -1,0 +1,14 @@
+{
+  "action": "enrich_active",
+  "regen": null,
+  "enrich": {
+    "n_new": 300,
+    "strategy": "residual_ucb",
+    "beta": 0.7,
+    "feasibility_weighting": true,
+    "rationale": "Residual-UCB active learning will concentrate new solves where the current winner demonstrably errs (and a bit beyond), yielding more RMSE reduction per added sample than blind resampling or additional hyperparameter search."
+  },
+  "extend": null,
+  "terminate": null,
+  "diagnosis": "RMSE is still primarily limited by insufficient/uneven sample coverage in specific input directions (r0, a, kappa, delta, Ip) producing structured residuals, with stable validation across seeds."
+}

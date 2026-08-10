@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """End-to-end mock of the Phase-2 pipeline against the real Phase-1 dataset.
 
 Simulates what the agent's runner would produce, without invoking the LLM:
@@ -31,8 +32,8 @@ REAL_DATASET = REPO_ROOT / "examples" / "dataset_generation" / "outputs" / "data
     reason=f"Phase-1 dataset not present at {REAL_DATASET}",
 )
 def test_phase2_pipeline_against_real_dataset(tmp_path: Path):
-    from autotokamak.eval.data import kfold, load_dataset
-    from autotokamak.surrogate import automl
+    from autotokamak.surrogate.dataset import kfold, load_dataset
+    from autotokamak.surrogate import optuna_search as automl
     from autotokamak.surrogate.schema import SearchSpec, SurrogateReport
     from autotokamak.surrogate.zoo import DEFAULT_SEARCH_SPACES
 
@@ -56,8 +57,8 @@ def test_phase2_pipeline_against_real_dataset(tmp_path: Path):
     )
     # A runner stub that the scorer's runner_cleanliness term will grade.
     (ws / "run_surrogate_automl.py").write_text(
-        "from autotokamak.eval.data import load_dataset, kfold\n"
-        "from autotokamak.surrogate import automl\n"
+        "from autotokamak.surrogate.dataset import load_dataset, kfold\n"
+        "from autotokamak.surrogate import optuna_search as automl\n"
         "# (this is a test stub; real runner is agent-authored)\n"
     )
     (ws / "README.md").write_text("# surrogate_automl test workspace\n")
@@ -92,7 +93,7 @@ def test_phase2_pipeline_against_real_dataset(tmp_path: Path):
     )
 
     # 3. Write the report the agent would write.
-    from autotokamak.eval.metrics import psi_rmse
+    from autotokamak.surrogate.metrics import psi_rmse
 
     import joblib
 
@@ -134,7 +135,7 @@ def test_phase2_pipeline_against_real_dataset(tmp_path: Path):
 
     sys.path.insert(0, str(REPO_ROOT / "src" / "autotokamak"))
     try:
-        from agent.runners.scoring import try_score
+        from autotokamak.bench.scoring import try_score
     finally:
         sys.path.pop(0)
 
@@ -152,7 +153,7 @@ def test_try_score_handles_missing_scorer_gracefully(tmp_path: Path):
 
     sys.path.insert(0, str(REPO_ROOT / "src" / "autotokamak"))
     try:
-        from agent.runners.scoring import try_score
+        from autotokamak.bench.scoring import try_score
     finally:
         sys.path.pop(0)
 

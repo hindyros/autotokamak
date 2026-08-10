@@ -1,0 +1,134 @@
+# L3 from-scratch capability test (any harness).
+#
+# Question under test: can a coding agent, given ONE task prompt and no access
+# to the autotokamak platform code, do the whole job this repo does with
+# human-engineered pipelines — smart/active data generation against the
+# TokaMaker solver AND ML surrogate training — end to end?
+#
+# Deliberately NOT in this prompt: the autotokamak.core API, our dataset
+# schema, our sampling method, our model zoo, our meta-loop. Only the task,
+# the evaluation interface, and hard environment facts. The no-autotokamak
+# rule is AUDITED by bench.contract (hard gate), not merely requested.
+#
+# Run:  python -m autotokamak.bench run --task benchmarks/tasks/L3_from_scratch.yaml --harness <name>
+task_id: L3_from_scratch
+access_level: L3
+problem: "TITLE\n  Build, end to end, a machine-learning surrogate for fixed-boundary\n\
+  \  Grad-Shafranov tokamak equilibria \u2014 including a data-generation\n  campaign\
+  \ with adaptive (active) sampling \u2014 from scratch.\n\nTHE TASK\n  TokaMaker,\
+  \ part of the pip-installed `OpenFUSIONToolkit` Python\n  package, solves the\
+  \ Grad-Shafranov equation for the poloidal flux\n  psi(R, Z) of a tokamak plasma.\
+  \ You will use it as your ground-truth\n  physics solver.\n\n  Consider fixed-boundary\
+  \ equilibria of D-shaped plasmas described by\n  5 input parameters, with TokaMaker's\
+  \ default pressure/current\n  profile shapes:\n\n    r0    : major radius    \
+  \    [m]   in [0.35, 0.55]\n    a     : minor radius        [m]   in [0.10, 0.20]\n\
+  \    kappa : elongation          [-]   in [1.0, 1.6]\n    delta : triangularity\
+  \       [-]   in [0.0, 0.4]\n    Ip    : plasma current      [A]   in [80e3, 200e3]\n\
+  \    (plasma centered at z0 = 0)\n\n  Your job, in full:\n    1. Learn how to\
+  \ drive TokaMaker for fixed-boundary solves (mesh a\n       D-shaped last-closed-flux-surface,\
+  \ solve, extract psi). Choose\n       your own numerical resolution; a single\
+  \ solve should take\n       seconds, not minutes.\n    2. Design and run a DATA-GENERATION\
+  \ CAMPAIGN structured as an\n       initial space-filling design followed by UP\
+  \ TO 10 ADAPTIVE\n       (ACTIVE-SAMPLING) ROUNDS of EXACTLY 500 new solver runs\
+  \ each\n       (failed/unconverged solves count against a round's 500).\n    \
+  \   A one-shot space-filling or random design alone is NOT\n       sufficient:\
+  \ each round's 500 new solver evaluations must be\n       chosen ADAPTIVELY, informed\
+  \ by the current model or data (your\n       strategy \u2014 e.g. uncertainty,\
+  \ model error, disagreement,\n       anything you can justify). STOPPING CRITERION:\
+  \ keep a held-out\n       VALIDATION set (separate from the final test set of\
+  \ step 4,\n       which must never influence the campaign); after each round,\n\
+  \       retrain your surrogate and stop the campaign early once its\n       validation\
+  \ error is reduced by at least 70% relative to the\n       mean-predictor baseline\
+  \ (a model that always predicts the\n       training-set mean psi map), i.e. val_error\
+  \ <= 0.30 *\n       baseline_error. Otherwise continue to the 10-round cap. Log\n\
+  \       every acquisition decision (which point, when, why) and each\n       round's\
+  \ validation error vs baseline to an acquisition log\n       file.\n    3. Train\
+  \ an ML surrogate mapping the 5 parameters to the PHYSICAL\n       poloidal flux\
+  \ psi(R, Z) in Webers (not a normalized flux).\n       Model family, input/output\
+  \ representation, and training\n       procedure are entirely your choice.\n \
+  \   4. Evaluate honestly on a held-out test set of AT LEAST 60 solver\n      \
+  \ runs at uniformly random parameters (fixed recorded seed),\n       generated\
+  \ independently and never used for training, model\n       selection, or acquisition.\n\
+  \    5. Report results and analyze whether your adaptive sampling\n       actually\
+  \ helped (e.g. versus the model trained on the initial\n       design only, or\
+  \ any comparison you can defend).\n\nEVALUATION INTERFACE (fixed, so results are\
+  \ comparable across methods)\n  Predictions and metrics are defined on this fixed\
+  \ rectangular grid:\n    R : 64 points, uniform in [0.15, 0.80] m\n    Z : 96\
+  \ points, uniform in [-0.40, 0.40] m\n  psi arrays are shaped (96, 64) = (nZ,\
+  \ nR). Grid points outside the\n  plasma boundary carry NaN; all metrics are computed\
+  \ only where the\n  ground truth is finite.\n\n  Required metric: per-sample relative\
+  \ L2 error\n    err_i = ||psi_pred_i - psi_true_i||_2 / ||psi_true_i||_2\n  over\
+  \ the finite grid points. Report mean, median, and 90th\n  percentile over the\
+  \ test set, and the same numbers for a trivial\n  baseline (predict the training-set\
+  \ mean psi) so the surrogate's\n  value is evident.\n\nDELIVERABLES (all in your\
+  \ current working directory; internal file\nformats and code organization are\
+  \ your choice)\n  1. Your pipeline code, runnable end to end by one documented\
+  \ entry\n     command.\n  2. The dataset(s) you generated, plus the acquisition\
+  \ log.\n  3. The trained model artifact, plus a prediction script with EXACTLY\n\
+  \     this interface:\n       python predict.py --input params.json --output pred.npz\n\
+  \     where params.json is a JSON list of objects with keys\n     r0, a, kappa,\
+  \ delta, Ip, and pred.npz contains:\n       psi : (N, 96, 64) float64   predicted\
+  \ flux [Wb], NaN outside plasma\n       R   : (64,) float64         grid R coordinates\
+  \ [m]\n       Z   : (96,) float64         grid Z coordinates [m]\n  4. report.json\
+  \ \u2014 machine-readable summary with at least:\n       n_solves_attempted, n_solves_succeeded,\
+  \ n_train, n_test,\n       sampling_strategy (short text), acquisition_log (path),\n\
+  \       metrics: {test_rel_l2: {mean, median, p90},\n                 baseline_rel_l2:\
+  \ {mean, median, p90}},\n       adaptive_vs_initial (your evidence that adaptivity\
+  \ helped,\n       or an honest statement that it did not).\n  5. README.md \u2014\
+  \ your design, why you chose it, how to run, results.\n\n  You MUST actually run\
+  \ the full campaign and training within this\n  session and verify every deliverable\
+  \ exists before declaring done.\n  Report failures honestly in report.json/README;\
+  \ do not fabricate\n  metrics.\n\nENVIRONMENT FACTS\n  * Your current working\
+  \ directory IS your workspace. Create all files\n    here. Do not read, copy,\
+  \ or import code from the surrounding\n    repository. In particular the Python\
+  \ environment contains an\n    installed package called `autotokamak` that solves\
+  \ a related\n    problem \u2014 importing it, reading its source, or reusing its\n\
+  \    artifacts is FORBIDDEN: this is a from-scratch capability test,\n    and\
+  \ only `OpenFUSIONToolkit` may be used for physics.\n  * `python` resolves to\
+  \ a Python 3.11 venv that already has:\n    numpy, scipy, h5py, matplotlib, pyyaml,\
+  \ scikit-learn, torch,\n    optuna, OpenFUSIONToolkit. Nothing may be installed.\n\
+  \  * A read-only `./OpenFUSIONToolkit/` symlink to the full OFT\n    source tree\
+  \ is present in your workspace. BEFORE writing any\n    solver or meshing code,\
+  \ study the worked TokaMaker examples\n    under `OpenFUSIONToolkit/src/examples/TokaMaker/`\
+  \ (the\n    `fixed_boundary/` example is directly relevant) and follow the\n \
+  \   workflow they demonstrate rather than inventing your own\n    solver-facing\
+  \ plumbing.\n  * TokaMaker limitation: only ONE `OFT_env` may ever be created\
+  \ per\n    Python process. Structure your code so the environment object is\n\
+  \    created once and reused across all solves in a process, or run\n    solves\
+  \ in child processes.\n\nCONSTRAINTS\n  * MESHING MILESTONE (mandatory, before\
+  \ any campaign code): locate\n    the fixed-boundary example under\n    `OpenFUSIONToolkit/src/examples/TokaMaker/`,\
+  \ reproduce its\n    mesh-and-solve workflow as a standalone script in your workspace,\n\
+  \    run it, and verify it produces finite psi values. Only then\n    generalize\
+  \ it to your parameterized D-shape. Do not design your\n    own meshing approach\
+  \ when the examples demonstrate one.\n  * Do NOT construct the computational mesh\
+  \ yourself (e.g. via scipy\n    Delaunay) and pass raw triangles to the solver\
+  \ \u2014 TokaMaker\n    validates mesh topology and will reject hand-built\n \
+  \   triangulations. Use the meshing route the OFT examples use.\n  * PILOT GATE\
+  \ (mandatory): before the campaign, run a pilot of at\n    least 20 solves at\
+  \ random parameters. If the success rate is\n    below 50%, STOP, diagnose the\
+  \ per-failure error messages, fix,\n    and re-run the pilot. Never start the\
+  \ 500-solve rounds while the\n    pilot is failing.\n  * Do not run `pip install`\
+  \ or modify the environment.\n  * Do not call `git`.\n  * Do not prompt for user\
+  \ input; the task is fully autonomous.\n  * If errors arise, debug, fix your code,\
+  \ and re-run. Stay within\n    the campaign structure above (at most 10 adaptive\
+  \ rounds x 500\n    solves, plus the initial design and validation/test sets)\
+  \ across\n    ALL attempts that reach the solver.\n"
+expected_artifacts:
+- report.json
+- predict.py
+- README.md
+symlinks:
+- source: ./OpenFUSIONToolkit
+  dest: OpenFUSIONToolkit
+model:
+  ursa: openai:gpt-5.2
+  dspy: openai/gpt-5.2
+harness_notes:
+  ursa: |
+    URSA RUNTIME NOTE
+      `graph_store.sqlite` and `ursa_metrics/` in the workspace are
+      agent-runtime infrastructure; their presence is expected. Ignore
+      them entirely: do not read, write, delete, test, or build any
+      guard/tooling around them.
+timeout_seconds: 21600
+feedback_rounds: 2

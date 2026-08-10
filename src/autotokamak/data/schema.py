@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Pydantic schemas for the Phase-1 dataset sweep, used as a library.
 
 These mirror the YAML the Phase-1 agent emits in
@@ -20,7 +21,7 @@ PARAM_ORDER = ("r0", "a", "kappa", "delta", "Ip")
 
 class SamplingConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    method: Literal["lhs", "uniform"] = "lhs"
+    method: Literal["lhs", "uniform", "sobol"] = "lhs"
     n_samples: int = Field(ge=1, le=10_000)
     seed: int = 0
 

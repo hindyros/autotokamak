@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# provenance: URSA-generated (URSA plan->execute agent)
 """OpenFUSIONToolkit / TokaMaker: fixed-boundary equilibrium example (standalone).
 
 This script mirrors the workflow in:

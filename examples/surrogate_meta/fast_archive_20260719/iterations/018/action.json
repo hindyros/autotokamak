@@ -1,0 +1,14 @@
+{
+  "action": "enrich_active",
+  "regen": null,
+  "enrich": {
+    "n_new": 120,
+    "strategy": "residual_ucb",
+    "beta": 0.6,
+    "feasibility_weighting": true,
+    "rationale": "Residual-driven active learning will preferentially add samples where the current winner demonstrably errs, giving the highest chance to shave the remaining RMSE gap within the last two iterations."
+  },
+  "extend": null,
+  "terminate": null,
+  "diagnosis": "The bottleneck is data coverage in specific input directions (r0/a/kappa/delta/Ip) producing structured residuals, while train/val split noise is low and the learning curve has not plateaued."
+}

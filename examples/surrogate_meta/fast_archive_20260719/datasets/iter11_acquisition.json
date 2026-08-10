@@ -1,0 +1,23 @@
+{
+  "method": "residual_ucb",
+  "n_selected": 200,
+  "n_candidates": 4096,
+  "n_pca_components": 0,
+  "pca_explained_variance": 0.0,
+  "score_first": -7.508522621410414,
+  "score_last": -7.699991013614608,
+  "mean_feasibility": 0.9279622082726217,
+  "kernel_summaries": [
+    "3.1**2 * RBF(length_scale=[1.32, 0.926, 1.35, 4.07, 4.99]) + WhiteKernel(noise_level=0.019)"
+  ],
+  "seed": 12,
+  "notes": "Residual-UCB acquisition: 200 points from a 4096-point Sobol pool; error model = ARD-RBF GP on log OOF residuals of winner 'kernel_ridge' (2629 samples, 4-fold); beta=0.8; feasibility weighting ACTIVE (floor=0.02).",
+  "beta": 0.8,
+  "residual_summary": {
+    "n_oof": 2629,
+    "k_folds": 4,
+    "resid_mean": 0.00039577126540217225,
+    "resid_max": 0.0007634736740933396,
+    "resid_p90": 0.0005078265733968198
+  }
+}

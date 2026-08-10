@@ -1,7 +1,8 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Evaluate a trained surrogate and dump diagnostic plots.
 
 Usage:
-    python tools/eval_surrogate.py                       # workspace=examples/surrogate_automl
+    python tools/eval_surrogate.py                       # workspace=examples/surrogate_meta
     python tools/eval_surrogate.py --workspace <path>    # custom workspace
     python tools/eval_surrogate.py --out <dir>           # custom output dir
 
@@ -37,16 +38,50 @@ import numpy as np
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from autotokamak.eval.data import kfold, load_dataset
-from autotokamak.eval.metrics import baseline_mean_predictor_rmse, psi_rmse
-from autotokamak.eval.reduce import inverse_transform, transform
-from autotokamak.surrogate.automl import predict_with_winner
+from autotokamak.surrogate.dataset import kfold, load_dataset
+from autotokamak.pipelines.discover import (
+    find_eval_dataset,
+    find_report,
+    find_winner,
+)
+from autotokamak.surrogate.metrics import baseline_mean_predictor_rmse, psi_rmse
+from autotokamak.surrogate.reduce import inverse_transform, transform
+from autotokamak.surrogate.optuna_search import predict_with_winner
+
+
+def _find_study_db(workspace: Path) -> Path | None:
+    """Locate an Optuna study.db across direct and meta-loop sub-run layouts."""
+    candidates = [workspace / "outputs" / "study.db"]
+    sur = workspace / "surrogate_runs"
+    if sur.is_dir():
+        # latest sub-run's study first
+        candidates += sorted(sur.glob("*/outputs/study.db"), reverse=True)
+    for p in candidates:
+        if p.exists():
+            return p
+    return None
 
 
 def _load_run(workspace: Path):
-    payload = joblib.load(workspace / "outputs/winner.pkl")
-    bundle = load_dataset(workspace / "dataset.h5")
-    report = json.loads((workspace / "outputs/report.json").read_text())
+    """Load winner + eval dataset + report, resolving both workspace layouts.
+
+    The eval dataset is the winner's held-out set (the meta-loop's frozen shard
+    when present), so true-vs-predicted plots stay honest. See
+    ``autotokamak.pipelines.discover``.
+    """
+    winner_path = find_winner(workspace)
+    if winner_path is None:
+        raise FileNotFoundError(f"no winner.pkl found under {workspace}")
+    payload = joblib.load(winner_path)
+
+    ds_path = find_eval_dataset(workspace)
+    if ds_path is None:
+        raise FileNotFoundError(f"no dataset found under {workspace}")
+    bundle = load_dataset(ds_path)
+
+    report_path = find_report(workspace)
+    report = json.loads(report_path.read_text()) if report_path else {}
+
     seed = 0
     k = 4
     test_frac = 2 / bundle.n_samples
@@ -252,7 +287,7 @@ def plot_pca_reconstruction(bundle, payload, splits, out_dir):
 
 
 def plot_optuna_history(study_db, out_dir):
-    if not study_db.exists():
+    if study_db is None or not Path(study_db).exists():
         return
     try:
         import optuna
@@ -311,7 +346,7 @@ def _summary(workspace, payload, bundle, splits, report):
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--workspace", default=str(REPO_ROOT / "examples/surrogate_automl"))
+    ap.add_argument("--workspace", default=str(REPO_ROOT / "examples/surrogate_meta"))
     ap.add_argument("--out", default=None, help="Output dir (default: <workspace>/outputs/eval_plots)")
     args = ap.parse_args()
 
@@ -328,7 +363,7 @@ def main() -> None:
         ("residual_histogram", lambda: plot_residual_histogram(bundle, payload, splits, out_dir)),
         ("pca_variance", lambda: plot_pca_variance(payload, out_dir)),
         ("pca_reconstruction", lambda: plot_pca_reconstruction(bundle, payload, splits, out_dir)),
-        ("optuna_history", lambda: plot_optuna_history(workspace / "outputs/study.db", out_dir)),
+        ("optuna_history", lambda: plot_optuna_history(_find_study_db(workspace), out_dir)),
     ]
     for name, fn in plots:
         try:

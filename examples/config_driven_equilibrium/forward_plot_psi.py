@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# provenance: URSA-generated (URSA plan->execute agent)
 """One isolated TokaMaker solve and ψ plot (subprocess helper for run_invert_psi).
 
 Usage:

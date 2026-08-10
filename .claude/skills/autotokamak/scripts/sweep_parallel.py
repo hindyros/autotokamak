@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Fan out a discretization sweep over N worker processes.
 
 The OFT_env singleton forbids threading and forbids concurrent solves inside

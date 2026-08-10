@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """TokaMaker solver setup + solve, with the retry-on-isoflux-fail fallback.
 
 Both example runners pre-refactor implemented this dance themselves. The logic

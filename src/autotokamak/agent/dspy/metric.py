@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Composite scoring function for agent-driven dataset generation runs.
 
 Pure-Python, no DSPy dependency. Use it three ways:

@@ -1,0 +1,13 @@
+{
+  "R": {
+    "n": 64,
+    "low": 0.15,
+    "high": 0.8
+  },
+  "Z": {
+    "n": 96,
+    "low": -0.4,
+    "high": 0.4
+  },
+  "note": "psi arrays are (nZ, nR) = (96, 64); NaN outside the plasma boundary"
+}

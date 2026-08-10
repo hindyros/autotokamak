@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Bridge ``score_meta_run`` to a GEPA-compatible feedback metric.
 
 GEPA's ``GEPAFeedbackMetric`` protocol expects:

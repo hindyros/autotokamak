@@ -1,11 +1,12 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Pydantic v2 schemas for surrogate AutoML configs and outputs.
 
 Mirrors the pattern in ``autotokamak.core.schema``:
 
 - ``SearchSpec`` — what the agent emits per outer-loop round (which models,
   which hyperparameter ranges, how many trials each)
-- ``StudyResult`` — what ``automl.run_study`` returns and what
-  ``automl.summarize_study`` reads back
+- ``StudyResult`` — what ``optuna_search.run_study`` returns and what
+  ``optuna_search.summarize_study`` reads back
 - ``SurrogateConfig`` — top-level ``surrogate_config.yaml`` validated at
   runtime; lets the agent (and the scorer) trust required fields are present
 - ``SurrogateReport`` — schema for the workspace's ``outputs/report.json``;

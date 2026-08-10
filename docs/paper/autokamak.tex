@@ -1,0 +1,632 @@
+\documentclass[11pt]{article}
+
+% ---------------------------------------------------------------------------
+% Packages
+% ---------------------------------------------------------------------------
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{bm}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{caption}
+
+\captionsetup{font=small,labelfont=bf}
+
+% ---------------------------------------------------------------------------
+% Notation macros
+% ---------------------------------------------------------------------------
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Prob}{\mathbb{P}}
+\newcommand{\x}{\bm{x}}
+\newcommand{\X}{\mathcal{X}}
+\newcommand{\psiv}{\bm{\psi}}
+\newcommand{\cvec}{\bm{c}}
+\newcommand{\Wmat}{\bm{W}}
+\newcommand{\Kmat}{\bm{K}}
+\newcommand{\Imat}{\bm{I}}
+\newcommand{\gp}{\mathcal{GP}}
+\newcommand{\Normal}{\mathcal{N}}
+\newcommand{\rmse}{\mathrm{RMSE}}
+\newcommand{\gstar}{g^{\star}}
+\newcommand{\lcfs}{\Gamma}
+\newcommand{\paramvec}{(R_0,a,\kappa,\delta,I_p)}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator*{\argmax}{arg\,max}
+
+\newtheorem{definition}{Definition}
+
+% ---------------------------------------------------------------------------
+% Title
+% ---------------------------------------------------------------------------
+\title{\textbf{Autokamak}: An Agentic Pipeline for Learning\\
+Grad--Shafranov Equilibrium Surrogates\\[0.3em]
+\large A Mathematical System Description}
+\author{Hindy Rossignol}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+\emph{Autokamak} is a research platform that couples a finite-element
+Grad--Shafranov (GS) equilibrium solver (\textsc{TokaMaker}/OpenFUSIONToolkit)
+with a machine-learning pipeline that learns fast surrogate models for the
+poloidal flux field $\psi(R,Z)$, and with an LLM-driven \emph{meta-agent}
+that plans and runs the pipeline end to end. The system is organized in three
+phases: (i) generation of a seed dataset by space-filling sampling of tokamak
+geometries; (ii) automated surrogate training with dimensionality reduction
+and hyperparameter search; and (iii) \emph{residual-driven active sampling},
+in which a Gaussian process learns \emph{where the current surrogate is wrong}
+as a function of geometry and proposes the next equilibria to solve. An outer
+meta-loop selects among data-enrichment and re-tuning actions until a
+performance target is met. This document gives a self-contained mathematical
+account of every model in the pipeline, stating each optimization problem
+explicitly.
+\end{abstract}
+
+\tableofcontents
+
+% ===========================================================================
+\section{System Overview}
+% ===========================================================================
+
+We wish to approximate the map from a low-dimensional description of a plasma
+equilibrium to the full two-dimensional flux field it produces. Let
+\begin{equation}
+  \x = \paramvec \in \X \subset \R^5
+\end{equation}
+denote the \emph{geometry vector}: major radius $R_0$, minor radius $a$,
+elongation $\kappa$, triangularity $\delta$, and total plasma current $I_p$.
+The ground-truth solver returns the poloidal flux $\psi(R,Z)$, which after
+interpolation onto a fixed $n_z\times n_r$ grid we regard as a vector
+$\psiv \in \R^{D}$ with $D = n_z n_r$ (in the shipped configuration
+$n_z=96$, $n_r=64$, so $D=6144$). The object we learn is the operator
+\begin{equation}
+  \mathcal{S}:\ \X \to \R^{D}, \qquad \x \mapsto \psiv,
+\end{equation}
+called the \emph{surrogate}. The three phases of the pipeline correspond to:
+building a training set $\{(\x_i,\psiv_i)\}$ (Section~\ref{sec:phase1}); fitting
+$\mathcal{S}$ (Section~\ref{sec:phase2}); and choosing new $\x$ to solve so as
+to improve $\mathcal{S}$ where it is weakest (Section~\ref{sec:phase3}). An
+LLM meta-agent orchestrates the loop (Section~\ref{sec:meta}), and an agentic
+code-generation layer (URSA) authors open-ended pipeline components
+(Section~\ref{sec:ursa}).
+
+% ===========================================================================
+\section{The Ground-Truth Problem: Grad--Shafranov Equilibrium}
+\label{sec:gs}
+% ===========================================================================
+
+A magnetically confined, axisymmetric plasma in force balance satisfies the
+\emph{Grad--Shafranov equation}, a nonlinear elliptic PDE for the poloidal
+flux $\psi(R,Z)$ in the poloidal plane $(R,Z)$:
+\begin{equation}
+  \Delta^{\!*}\psi
+  \;=\; -\,\mu_0 R^2\, p'(\psi)\;-\;F(\psi)\,F'(\psi),
+  \label{eq:gs}
+\end{equation}
+where the elliptic \emph{Shafranov} operator is
+\begin{equation}
+  \Delta^{\!*}\psi
+  \;=\; R\,\frac{\partial}{\partial R}\!\left(\frac{1}{R}\frac{\partial \psi}{\partial R}\right)
+  + \frac{\partial^2 \psi}{\partial Z^2}.
+\end{equation}
+Here $\mu_0$ is the vacuum permeability, $p(\psi)$ the plasma pressure profile,
+and $F(\psi)=R B_\phi$ the poloidal-current function; primes denote
+$\mathrm{d}/\mathrm{d}\psi$. The right-hand side is the toroidal current density
+$-\mu_0 R\, J_\phi$. Equation~\eqref{eq:gs} is solved on the plasma
+cross-section bounded by the \emph{last closed flux surface} (LCFS)
+$\lcfs$, a closed curve prescribed (in the fixed-boundary setting used here)
+by the shaping parameters through a Miller-type parameterization
+\begin{equation}
+  R(\theta) = R_0 + a\cos\!\big(\theta + \arcsin\delta \cdot \sin\theta\big),
+  \qquad
+  Z(\theta) = z_0 + \kappa\, a \sin\theta,
+  \qquad \theta \in [0,2\pi).
+  \label{eq:lcfs}
+\end{equation}
+\textsc{TokaMaker} discretizes~\eqref{eq:gs} with a finite-element method on an
+unstructured triangular mesh of the region enclosed by $\lcfs$, imposing the
+total current constraint $\int J_\phi \,\mathrm{d}R\,\mathrm{d}Z = I_p$ and an
+isoflux boundary condition matching $\lcfs$. The nonlinearity in $p'$ and
+$FF'$ is resolved by Picard iteration. The solver is the \emph{oracle}: given
+$\x$, it returns $\psi$ on the mesh, which we bilinearly interpolate to the
+fixed $(R,Z)$ grid to obtain $\psiv \in \R^{D}$. Cells outside $\lcfs$ are
+undefined and marked \texttt{NaN}. A solve occasionally fails (mesh
+degeneracy or non-convergence at extreme shaping); we record a
+\emph{feasibility} indicator $y^{\mathrm{feas}} \in \{0,1\}$ per attempt,
+which becomes important in Section~\ref{sec:phase3}.
+
+Each solve costs seconds of wall-clock; a surrogate that emulates
+$\mathcal{S}$ in microseconds is the goal, and the cost asymmetry is what
+makes \emph{which equilibria to solve} an economically meaningful question.
+
+% ===========================================================================
+\section{Phase 1: Seed Dataset Generation}
+\label{sec:phase1}
+% ===========================================================================
+
+\subsection{Sampling designs}
+
+Phase~1 draws $N$ geometries from a bounded box
+$\mathcal{B} = \prod_{d=1}^5 [\ell_d, u_d] \subseteq \X$ (the \emph{seed box})
+and solves each. Because we cannot yet know where the eventual surrogate will
+struggle, the seed draw is \emph{blind}; the design goal is uniform coverage.
+Three seeded designs are supported.
+
+\paragraph{Uniform.} Independent draws $\x_i \sim \mathrm{Unif}(\mathcal{B})$.
+Simple, but at finite $N$ leaves clusters and gaps by chance.
+
+\paragraph{Latin Hypercube Sampling (LHS).} Partition each axis into $N$ equal
+bins and permute so that every bin is occupied exactly once per dimension.
+With $\pi^{(d)}$ a random permutation of $\{0,\dots,N-1\}$ and
+$U^{(d)}_i \sim \mathrm{Unif}(0,1)$,
+\begin{equation}
+  x_{i,d} = \ell_d + (u_d-\ell_d)\,\frac{\pi^{(d)}_i + U^{(d)}_i}{N}.
+\end{equation}
+LHS guarantees one-dimensional uniformity by construction.
+
+\paragraph{Sobol (low-discrepancy).} A deterministic, scrambled Sobol sequence
+minimizes the \emph{star discrepancy}
+\begin{equation}
+  D^{\star}_N \;=\; \sup_{\bm{b}\in\mathcal{B}}
+  \left|\,\frac{\#\{\x_i \in [\ell,\bm{b})\}}{N}
+  - \frac{\mathrm{vol}[\ell,\bm{b})}{\mathrm{vol}\,\mathcal{B}}\,\right|,
+\end{equation}
+which measures the worst-case deviation between the empirical fraction of
+points in any sub-box and its volume fraction. Low-discrepancy sequences
+achieve $D^\star_N = O\!\big((\log N)^5/N\big)$ versus $O(N^{-1/2})$ for i.i.d.
+uniform, giving the most even coverage of $\mathcal{B}$ in five dimensions.
+The same scrambled-Sobol routine supplies the acquisition candidate pool in
+Section~\ref{sec:phase3}.
+
+\subsection{Dataset}
+Solving the $N$ designs yields the seed dataset
+\begin{equation}
+  \mathcal{D}_N = \big\{(\x_i,\,\psiv_i,\,y^{\mathrm{feas}}_i)\big\}_{i=1}^{N},
+\end{equation}
+where $\psiv_i$ is defined only for feasible solves. We store \emph{physical}
+$\psi$ in webers (not the normalized $\psi_N\in[0,1]$), because normalization
+erases the $I_p$ amplitude dependence the surrogate must learn.
+
+% ===========================================================================
+\section{Phase 2: Surrogate Modeling}
+\label{sec:phase2}
+% ===========================================================================
+
+Direct regression onto $\R^{D}$ ($D\approx 6144$) from five inputs is
+ill-posed. Phase~2 therefore factors $\mathcal{S}$ into a linear
+dimensionality reduction learned from data and a low-dimensional nonlinear
+regressor:
+\begin{equation}
+  \mathcal{S}(\x) \;=\; \bm{\mu}_\psi + \Wmat\, h(\x),
+  \label{eq:surrogate-factor}
+\end{equation}
+with $\bm{\mu}_\psi\in\R^D$ a mean field, $\Wmat\in\R^{D\times k}$ an
+orthonormal basis, and $h:\X\to\R^k$ the regressor ($k\ll D$).
+
+\subsection{Principal Component Analysis of the flux field}
+
+Let $\bm{\mu}_\psi = \frac1n\sum_i \psiv_i$ (per-pixel mean; \texttt{NaN} cells
+are mean-filled). PCA seeks the rank-$k$ orthonormal basis minimizing
+reconstruction error, equivalently maximizing retained variance:
+\begin{equation}
+  \Wmat^\star
+  = \argmin_{\Wmat\in\R^{D\times k},\;\Wmat^\top\Wmat=\Imat_k}
+  \sum_{i=1}^{n} \big\|\,(\psiv_i-\bm{\mu}_\psi)
+  - \Wmat\Wmat^\top(\psiv_i-\bm{\mu}_\psi)\,\big\|_2^2 .
+  \label{eq:pca}
+\end{equation}
+The solution is the matrix whose columns are the top-$k$ eigenvectors of the
+empirical covariance
+$\bm{\Sigma}=\frac1n\sum_i(\psiv_i-\bm{\mu}_\psi)(\psiv_i-\bm{\mu}_\psi)^\top$,
+ordered by eigenvalue $\lambda_1\ge\dots\ge\lambda_k$. Each field is encoded by
+its coefficient vector and reconstructed by
+\begin{equation}
+  \cvec_i = \Wmat^{\star\top}(\psiv_i-\bm{\mu}_\psi)\in\R^k,
+  \qquad
+  \hat{\psiv}_i = \bm{\mu}_\psi + \Wmat^\star \cvec_i .
+\end{equation}
+The retained-variance fraction is
+$\mathrm{EV}(k)=\sum_{j\le k}\lambda_j / \sum_{j}\lambda_j$; we choose the
+smallest $k$ with $\mathrm{EV}(k)\ge 0.95$ (physical $\psi$ typically needs
+$k\approx 8$). The regression target is thus the compact $\cvec\in\R^k$, not
+the $6144$-dimensional field.
+
+\subsection{The regressor zoo}
+
+The regressor $h:\X\to\R^k$ is chosen from four classical families. All
+operate on standardized inputs $\tilde\x = (\x-\bar\x)/\bm{s}$ (component-wise;
+$I_p\sim10^5$ dwarfs $R_0\sim10^{-1}$ otherwise). We state each family's
+training objective; multi-output ($k$ coefficients) is handled per output or
+jointly as noted.
+
+\paragraph{(a) Polynomial ridge regression.}
+With polynomial feature map $\phi_d(\x)$ of total degree $\le d$, each
+coefficient channel $j$ solves a ridge least-squares problem
+\begin{equation}
+  \bm{\beta}_j^\star
+  = \argmin_{\bm{\beta}\in\R^{m}}
+  \sum_{i=1}^{n}\big(c_{i,j} - \bm{\beta}^\top\phi_d(\tilde\x_i)\big)^2
+  + \alpha\,\|\bm{\beta}\|_2^2,
+\end{equation}
+with closed-form solution
+$\bm{\beta}_j^\star=(\bm{\Phi}^\top\bm{\Phi}+\alpha\Imat)^{-1}\bm{\Phi}^\top\bm{c}_{:,j}$,
+where $\bm{\Phi}$ stacks $\phi_d(\tilde\x_i)^\top$. Hyperparameters:
+$\alpha$ (ridge penalty), $d\in\{1,2,3\}$.
+
+\paragraph{(b) Kernel ridge regression (KRR).}
+Working in a reproducing-kernel Hilbert space $\mathcal{H}_\kappa$,
+\begin{equation}
+  f_j^\star = \argmin_{f\in\mathcal{H}_\kappa}
+  \sum_{i=1}^{n}\big(c_{i,j}-f(\tilde\x_i)\big)^2 + \lambda\,\|f\|_{\mathcal{H}_\kappa}^2 .
+\end{equation}
+By the representer theorem the minimizer is
+$f_j^\star(\x)=\sum_{i}\alpha_{i}\,\kappa(\x,\x_i)$ with dual weights
+\begin{equation}
+  \bm{\alpha}_j = (\Kmat + \lambda \Imat)^{-1}\,\bm{c}_{:,j},
+  \qquad K_{ii'}=\kappa(\tilde\x_i,\tilde\x_{i'}),
+\end{equation}
+and kernel $\kappa$ chosen from RBF $\kappa(\x,\x')=\exp(-\gamma\|\x-\x'\|^2)$
+or Laplacian $\exp(-\gamma\|\x-\x'\|_1)$. Hyperparameters: $\lambda$ (=\,\texttt{alpha}),
+$\gamma$, kernel type.
+
+\paragraph{(c) Gaussian process regression (GPR).}
+Place a GP prior $f\sim\gp(0,\kappa_\vartheta)$ and Gaussian likelihood
+$c = f(\tilde\x)+\varepsilon$, $\varepsilon\sim\Normal(0,\sigma_n^2)$.
+Kernel hyperparameters $\vartheta$ (signal variance, length scale, noise) are
+fit by maximizing the log marginal likelihood
+\begin{equation}
+  \vartheta^\star = \argmax_{\vartheta}\;
+  -\tfrac12\bm{c}^\top(\Kmat_\vartheta+\sigma_n^2\Imat)^{-1}\bm{c}
+  -\tfrac12\log\big|\Kmat_\vartheta+\sigma_n^2\Imat\big|
+  -\tfrac{n}{2}\log 2\pi .
+  \label{eq:gp-mll}
+\end{equation}
+Prediction at a test $\x_*$ is Gaussian with the standard posterior mean/variance
+(Eqs.~\eqref{eq:gp-post-mean}--\eqref{eq:gp-post-var} below, applied to the
+$\cvec$ targets). Hyperparameters exposed to search: \texttt{length\_scale},
+\texttt{noise\_level}, \texttt{alpha} (jitter).
+
+\paragraph{(d) Multilayer perceptron (MLP).}
+A feed-forward network $f_\theta$ (at most two hidden layers, width $\le256$)
+minimizes penalized mean-squared error
+\begin{equation}
+  \theta^\star=\argmin_\theta
+  \frac1n\sum_{i=1}^{n}\big\|\cvec_i-f_\theta(\tilde\x_i)\big\|_2^2
+  + \alpha\,\|\theta\|_2^2,
+\end{equation}
+optimized by Adam. Hyperparameters: depth, width, $\ell_2$ penalty $\alpha$,
+initial learning rate. Deep operator/PINN/FNO families are deliberately out of
+scope for this proof of concept.
+
+\subsection{Model selection: cross-validated hyperparameter search}
+\label{sec:optuna}
+
+For a model family $M$ and hyperparameters $\bm{\eta}$, quality is the
+$K$-fold cross-validated error measured in \emph{original} $\psi$ units (PCA is
+refit on each training fold to avoid leakage, then inverse-transformed before
+scoring):
+\begin{equation}
+  J(M,\bm{\eta})
+  = \frac{1}{K}\sum_{f=1}^{K}
+  \rmse\!\Big(\{\psiv_i\}_{i\in V_f},\,
+  \{\bm{\mu}_\psi^{(f)}+\Wmat^{(f)} h_{M,\bm{\eta}}^{(f)}(\x_i)\}_{i\in V_f}\Big),
+  \label{eq:cv-objective}
+\end{equation}
+where $V_f$ is validation fold $f$ and the superscript $(f)$ denotes quantities
+fit on the complementary training rows. The RMSE over valid grid cells $\Omega$
+is
+\begin{equation}
+  \rmse(\psiv,\hat\psiv)
+  = \sqrt{\frac{1}{|\Omega|}\sum_{(R,Z)\in\Omega}\big(\psi(R,Z)-\hat\psi(R,Z)\big)^2}.
+  \label{eq:rmse}
+\end{equation}
+The search minimizes $J$ over the joint (family, hyperparameter) space using the
+Tree-structured Parzen Estimator (TPE), a sequential model-based optimizer that
+models $p(\bm{\eta}\mid J<J^\ast)$ and $p(\bm{\eta}\mid J\ge J^\ast)$ and samples
+$\bm{\eta}$ maximizing their ratio:
+\begin{equation}
+  (M^\star,\bm{\eta}^\star) = \argmin_{M,\bm{\eta}} J(M,\bm{\eta}).
+\end{equation}
+Writing $\hat h = h_{M^\star,\bm{\eta}^\star}$ for the winner, the winning
+configuration is refit on \emph{all} non-test rows to produce the deployed
+payload $\{\Wmat,\bm{\mu}_\psi,\hat h\}$.
+
+\subsection{Reference metric: skill over the trivial baseline}
+
+To make errors interpretable and scale-free we compare against the trivial
+predictor that ignores $\x$ and returns the per-pixel training mean
+$\bm{\mu}_\psi$. Its error on an evaluation set is
+\begin{equation}
+  \rmse_{\mathrm{base}}
+  = \rmse\!\big(\{\psiv_i\}_{i\in\mathrm{eval}},\,\{\bm{\mu}_\psi\}\big),
+\end{equation}
+and we define \emph{accuracy} as the fractional error reduction
+\begin{equation}
+  \mathrm{Acc} \;=\; 100\left(1-\frac{\rmse}{\rmse_{\mathrm{base}}}\right)\%.
+  \label{eq:accuracy}
+\end{equation}
+$\mathrm{Acc}=0$ means no better than the mean; $\mathrm{Acc}\to100$ means
+near-perfect. This quantity drives the meta-loop stopping rule
+(Section~\ref{sec:stopping}).
+
+% ===========================================================================
+\section{Phase 3: Residual-Driven Active Sampling}
+\label{sec:phase3}
+% ===========================================================================
+
+Given a trained surrogate, active sampling asks: \emph{which new geometries,
+once solved, most improve the surrogate per solve spent?} Our answer is to
+learn a probabilistic model of the surrogate's own error over geometry space
+and sample where that error is large \emph{or} uncertain.
+
+\subsection{Out-of-fold residuals: an honest error signal}
+
+Let $\hat h$ be the current winner. Its residual must be measured
+out-of-sample, because interpolating models (GPR, KRR) fit their own training
+points to $\approx 0$ error. We therefore compute \emph{out-of-fold} (OOF)
+residuals: partition the training pool into $K$ folds, refit the winner's
+architecture on each complement, and score each sample on the fold that held it
+out. For sample $i$ in fold $f(i)$,
+\begin{equation}
+  r_i \;=\; \frac{1}{|\Omega_i|}\sum_{(R,Z)\in\Omega_i}
+  \big|\,\psi_i(R,Z)-\hat\psi_i^{(-f(i))}(R,Z)\,\big|,
+  \label{eq:oof}
+\end{equation}
+the mean absolute flux error of the winner \emph{refit without} the fold
+containing $i$. This $r_i$ is the empirical ``how wrong is the surrogate at
+$\x_i$'' signal.
+
+\subsection{A Gaussian process over the error surface}
+
+We now learn the function $g:\X\to\R$ mapping geometry to (log) expected
+surrogate error, treating $\{(\tilde\x_i,\,\log r_i)\}$ as noisy observations.
+We place a GP prior
+\begin{equation}
+  g \sim \gp\big(0,\;\kappa_\vartheta\big),\qquad
+  \log r_i = g(\tilde\x_i) + \varepsilon_i,\quad \varepsilon_i\sim\Normal(0,\sigma_n^2),
+\end{equation}
+with an \emph{automatic relevance determination} (ARD) squared-exponential
+kernel plus a white-noise term,
+\begin{equation}
+  \kappa_\vartheta(\x,\x')
+  = \sigma_f^2 \exp\!\left(-\tfrac12\sum_{d=1}^{5}
+  \frac{(x_d-x'_d)^2}{\ell_d^2}\right) + \sigma_n^2\,\delta_{\x\x'} .
+  \label{eq:ard}
+\end{equation}
+Per-dimension length scales $\ell_d$ let the model discover which geometry axes
+drive error. The log target is used because error is multiplicative and
+heavy-tailed; the log keeps a few catastrophic samples from dominating.
+
+\paragraph{The GP is a distribution over functions.} Conditioning the prior on
+the OOF data $\bm{y}=(\log r_1,\dots,\log r_m)^\top$ at inputs
+$\tilde{X}=\{\tilde\x_i\}$ yields a \emph{posterior distribution over the whole
+space of error-surfaces} $g$. It is characterized by the property that, at any
+finite set of query geometries, the function values are jointly Gaussian. At a
+single candidate $\x_*$,
+\begin{align}
+  \mu_g(\x_*)
+  &= \bm{k}_*^\top(\Kmat+\sigma_n^2\Imat)^{-1}\bm{y},
+  \label{eq:gp-post-mean}\\[2pt]
+  \sigma_g^2(\x_*)
+  &= \kappa_\vartheta(\x_*,\x_*) - \bm{k}_*^\top(\Kmat+\sigma_n^2\Imat)^{-1}\bm{k}_* ,
+  \label{eq:gp-post-var}
+\end{align}
+where $K_{ii'}=\kappa_\vartheta(\tilde\x_i,\tilde\x_{i'})$ and
+$[\bm{k}_*]_i=\kappa_\vartheta(\x_*,\tilde\x_i)$. Thus $\mu_g(\x_*)$ is the
+posterior mean prediction of the surrogate's (log) error at $\x_*$, and
+$\sigma_g(\x_*)$ its posterior standard deviation --- large where many plausible
+error-surfaces are consistent with the data but disagree, i.e.\ where we have
+not sampled. Hyperparameters $\vartheta=(\sigma_f,\{\ell_d\},\sigma_n)$ are fit
+by maximizing the marginal likelihood~\eqref{eq:gp-mll} on the OOF targets.
+
+\subsection{Feasibility model}
+
+Solves fail in parts of $\X$, and a failed solve costs as much as a success.
+We learn the probability of success with a GP \emph{classifier}: a latent GP
+$\phi\sim\gp(0,\kappa)$ mapped through a sigmoid link,
+\begin{equation}
+  p(\x) \;=\; \Prob(y^{\mathrm{feas}}=1\mid \x)
+  \;=\; \sigma\big(\phi(\x)\big),
+  \qquad \sigma(z)=\frac{1}{1+e^{-z}},
+\end{equation}
+fit on \emph{all} attempts (successes and failures) by Laplace approximation of
+the posterior (the non-Gaussian likelihood has no closed form). We convert the
+probability into an acquisition weight with an exploration floor
+$\rho\in(0,1]$,
+\begin{equation}
+  w(\x) = \max\!\big(p(\x)^2,\ \rho\big).
+  \label{eq:feas-weight}
+\end{equation}
+Squaring makes a known-bad region unable to out-bid a merely well-covered
+feasible one on prior variance alone; the floor (default $\rho=0.02$) ensures no
+region is written off permanently. Setting $\rho=1$ disables feasibility
+weighting entirely.
+
+\subsection{Acquisition: upper confidence bound}
+
+We score candidate geometries by an upper-confidence-bound (UCB) rule that
+trades exploitation of known-high error against exploration of error-model
+uncertainty, modulated by feasibility. Working in log space (so the feasibility
+weight enters additively),
+\begin{equation}
+  \boxed{\;\;
+  a(\x) \;=\; \underbrace{\mu_g(\x)}_{\text{expected error}}
+  \;+\; \beta\,\underbrace{\sigma_g(\x)}_{\text{error-model uncertainty}}
+  \;+\; \underbrace{\log w(\x)}_{\text{feasibility}} .
+  \;\;}
+  \label{eq:ucb}
+\end{equation}
+The parameter $\beta\ge0$ (clamped to $[0,3]$, chosen by the meta-agent)
+controls exploration: $\beta=0$ samples purely where the model is
+\emph{predicted} worst; large $\beta$ samples where the error model is
+\emph{uncertain}, which is precisely how the batch reaches unvisited regions of
+a target envelope wider than the seed box. Equation~\eqref{eq:ucb} is the
+GP-UCB acquisition function of Bayesian optimization, applied here to the
+surrogate's \emph{error} rather than to $\psi$ itself.
+
+\subsection{Batch selection by exact variance conditioning}
+
+We must pick a \emph{batch} of $B$ points, not one, and they should not pile
+onto a single peak. We select greedily from a Sobol candidate pool
+$\mathcal{C}$ of size $N_c$ (default $4096$). A key fact: the GP posterior
+variance~\eqref{eq:gp-post-var} depends only on input \emph{locations}, not on
+observed values. Hence we can condition on a chosen point using a hallucinated
+observation at its own posterior mean (the ``kriging believer'' heuristic):
+the posterior mean is unchanged, and only the variance $\sigma_g^2$ shrinks near
+the chosen point. After each pick we update the Cholesky factor of
+$(\Kmat+\sigma_n^2\Imat)$ by a rank-one border update and re-score the pool.
+Algorithm~\ref{alg:acq} summarizes the procedure.
+
+\begin{algorithm}[t]
+\caption{Residual-driven UCB batch acquisition}
+\label{alg:acq}
+\begin{algorithmic}[1]
+\Require winner $\hat h$; pool $\mathcal{D}$; bounds $[\bm\ell,\bm u]$; batch $B$; exploration $\beta$
+\State compute OOF residuals $r_i$ via Eq.~\eqref{eq:oof}; set targets $y_i=\log r_i$
+\State fit error-model GP $g$ (Eq.~\eqref{eq:ard}) and feasibility model $p$; hyperparameters by Eq.~\eqref{eq:gp-mll}
+\State draw Sobol candidate pool $\mathcal{C}=\{\x^{(1)},\dots,\x^{(N_c)}\}\subset[\bm\ell,\bm u]$
+\State precompute $\mu_g(\x)$, $\log w(\x)$ for all $\x\in\mathcal{C}$
+\State $\mathcal{A}\gets\varnothing$
+\For{$b=1,\dots,B$}
+  \State $\x^\star \gets \argmax_{\x\in\mathcal{C}\setminus\mathcal{A}}\;
+         \mu_g(\x)+\beta\,\sigma_g(\x)+\log w(\x)$ \Comment{Eq.~\eqref{eq:ucb}}
+  \State $\mathcal{A}\gets\mathcal{A}\cup\{\x^\star\}$
+  \State condition $g$ on $\x^\star$ (kriging believer): rank-one Cholesky update, shrinking $\sigma_g^2$ near $\x^\star$
+\EndFor
+\State \Return batch $\mathcal{A}$ to solve with the oracle
+\end{algorithmic}
+\end{algorithm}
+
+The returned batch is solved by the oracle, merged into the pool, and the
+winner is refit --- yielding immediate credit (or none) on the frozen
+evaluation set. When no winner yet exists (cold start) or data is too sparse,
+the strategy degrades gracefully: to a model-agnostic PCA-variance acquisition
+(a GP over $\psi$ coefficients, chasing predictive variance of the field
+itself), and finally to feasibility-weighted maximin space-filling.
+
+\subsection{Strategy selection}
+
+The meta-agent may override the automatic ladder with one of four strategies:
+\texttt{auto} (residual-driven if a winner exists, else uncertainty);
+\texttt{residual\_ucb} (force Eq.~\eqref{eq:ucb}); \texttt{uncertainty}
+(model-agnostic field variance, for when the winner's residuals are still
+noisy); and \texttt{space\_filling} (pure maximin, to blanket a newly widened
+region before targeting within it).
+
+% ===========================================================================
+\section{The Meta-Loop: Autonomous Orchestration}
+\label{sec:meta}
+% ===========================================================================
+
+An outer loop drives Phases 1--3 as a sequential decision process. At each
+iteration $t$ the meta-agent observes a state $s_t$ (diagnostics of the current
+model: learning-curve slope, cross-seed variance, PCA spectrum, edge-hit flags,
+per-input residual correlations) and selects an action
+\begin{equation}
+  a_t \in \{\texttt{regen\_dataset},\ \texttt{enrich\_active},\
+  \texttt{extend\_search},\ \texttt{terminate}\},
+\end{equation}
+respectively: append a blind space-filling batch (control arm); append a
+residual-driven active batch (Section~\ref{sec:phase3}); run another Phase-2
+hyperparameter search; or stop. The action is produced by an LLM policy
+$\pi_\Theta$ expressed as a structured program that emits a typed decision; a
+deterministic dispatcher executes it. The policy \emph{prompt} $\Theta$ is
+itself optimizable: given a dataset of (state, decision, downstream-score)
+traces, a reflective prompt-evolution procedure (GEPA) searches
+\begin{equation}
+  \Theta^\star = \argmax_{\Theta}\;
+  \E_{\tau\sim\pi_\Theta}\big[\,\mathrm{Score}(\tau)\,\big],
+\end{equation}
+where $\mathrm{Score}$ is a composite of hard gates (deliverables present and
+loadable, report parseable) and weighted quality terms (final skill over
+baseline, monotone improvement across iterations, budget efficiency,
+non-wasted iterations, agent-chosen termination). Only the decision policy is
+learned; the acquisition mathematics of Section~\ref{sec:phase3} is fixed and
+deterministic for reproducibility.
+
+\subsection{Evaluation over a target envelope}
+
+Active sampling expands into geometries the seed box never covered, so the
+evaluation set must represent the full \emph{target envelope}
+$\mathcal{E}\supseteq\mathcal{B}$, not the seed distribution. We draw one
+independent LHS eval set over $\mathcal{E}$, solve it once, and \emph{freeze}
+it; every RMSE the loop reports is measured on these fixed samples. To reveal
+\emph{where} the surrogate is weak we stratify $\mathcal{E}$ into a grid of
+geometry cells $\{\mathcal{E}_q\}$ ($b$ bins per axis) and report per-cell
+error
+\begin{equation}
+  \rmse_q = \rmse\!\big(\{\psiv_i\}_{i:\x_i\in\mathcal{E}_q},\ \{\mathcal{S}(\x_i)\}\big),
+\end{equation}
+with headline summaries $\max_q \rmse_q$ (worst cell) and mean-over-cells.
+Aggregate RMSE alone cannot distinguish ``uniformly mediocre'' from ``excellent
+in the seed box, broken at high $\kappa$'' --- exactly the distinction active
+sampling exists to close.
+
+\subsection{Performance stopping criteria}
+\label{sec:stopping}
+
+The loop runs at most $T_{\max}$ iterations but stops early once the model is
+good enough. Three aggregate targets --- an absolute RMSE $\tau_{\mathrm{abs}}$,
+a ratio $\rho_r$ of baseline, and an accuracy $A$ (Eq.~\eqref{eq:accuracy}) ---
+are the same quantity in different units and collapse to the strictest
+threshold
+\begin{equation}
+  \tau^\star = \min\Big\{\tau_{\mathrm{abs}},\;
+  \rho_r\,\rmse_{\mathrm{base}},\;
+  \big(1-\tfrac{A}{100}\big)\rmse_{\mathrm{base}}\Big\},
+\end{equation}
+and the loop halts at the first iteration with $\rmse \le \tau^\star$. A
+stricter, per-region criterion halts only when \emph{every} occupied eval cell
+clears an accuracy bar against \emph{its own} baseline,
+\begin{equation}
+  \min_{q}\;100\left(1-\frac{\rmse_q}{\rmse_{\mathrm{base},q}}\right)
+  \;\ge\; A_{\mathrm{cell}} ,
+\end{equation}
+using per-cell baselines so a large-$\psi$ region is not penalized for its
+scale. This ``good everywhere'' rule is the natural target for active learning:
+it cannot be satisfied by a model that is accurate only in the seed box.
+
+% ===========================================================================
+\section{The Agentic Code-Generation Layer (URSA)}
+\label{sec:ursa}
+% ===========================================================================
+
+Beyond the fixed decision policy, an agentic layer (URSA) authors open-ended,
+code-shaped pipeline components via a plan--execute--feedback loop: a planner
+LLM emits a sequence of steps from a natural-language task; an executor LLM
+writes and runs code for each; and, after execution, the planner re-plans given
+the execution history for a bounded number of feedback rounds. This layer is
+used where the task is genuinely open (rather than a small typed decision), most
+notably \emph{representation search} --- exploring alternative input
+featurizations and output transforms for the surrogate under a fixed evaluation
+protocol --- and, optionally, as a code-generation backend for Phase-2 search.
+It is the mechanism by which the platform can extend its own data-engineering
+surface rather than only tuning within a fixed one.
+
+% ===========================================================================
+\section{Summary}
+% ===========================================================================
+
+Autokamak composes four mathematical layers. A finite-element solver provides
+ground truth for the Grad--Shafranov equation~\eqref{eq:gs}. A surrogate
+factored as PCA~\eqref{eq:pca} plus a cross-validated
+regressor~\eqref{eq:cv-objective} emulates the flux field. A Gaussian process
+over the surrogate's out-of-fold residuals~\eqref{eq:oof}--\eqref{eq:gp-post-var}
+turns ``where is the model wrong'' into a probabilistic surface, and a
+UCB rule~\eqref{eq:ucb} converts it into the next equilibria to solve. An LLM
+meta-policy sequences data enrichment and re-tuning against explicit accuracy
+targets~\eqref{eq:accuracy}. The through-line is a single principle: because
+the oracle is expensive and the surrogate is cheap, every design choice ---
+sampling, reduction, model selection, and above all acquisition --- is aimed at
+extracting the most model improvement per oracle call.
+
+\end{document}

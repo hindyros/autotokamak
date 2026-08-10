@@ -1,0 +1,14 @@
+{
+  "action": "enrich_active",
+  "regen": null,
+  "enrich": {
+    "n_new": 200,
+    "strategy": "residual_ucb",
+    "beta": 0.6,
+    "feasibility_weighting": true,
+    "rationale": "Residual-UCB active learning will concentrate new solves in the specific parameter regions where the current winner is measurably weak, improving RMSE faster than blind resampling."
+  },
+  "extend": null,
+  "terminate": null,
+  "diagnosis": "RMSE is currently sample-bottlenecked with structured residuals strongly correlated to key inputs (r0/a/kappa/delta/Ip), not dominated by split noise or hyperparameter tuning."
+}

@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Pydantic schema validation: accept good configs, reject bad ones."""
 
 from pathlib import Path

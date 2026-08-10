@@ -1,0 +1,14 @@
+{
+  "action": "enrich_active",
+  "regen": null,
+  "enrich": {
+    "n_new": 200,
+    "strategy": "residual_ucb",
+    "beta": 0.7,
+    "feasibility_weighting": true,
+    "rationale": "Residual-UCB active learning will concentrate new solves in the specific input directions where the current winner is measurably weak, improving accuracy faster than blind resampling or additional hyperparameter search."
+  },
+  "extend": null,
+  "terminate": null,
+  "diagnosis": "RMSE is still sample-bottlenecked with structured, input-correlated residuals (r0/a/kappa/delta/Ip), while split variance is low so targeted new samples should translate into real RMSE gains."
+}

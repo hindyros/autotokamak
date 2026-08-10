@@ -32,6 +32,53 @@ Quick run:
 python examples/config_driven_equilibrium/run_equilibrium_from_config.py examples/config_driven_equilibrium/discretization_config.yaml
 ```
 
+## `examples/dataset_generation`
+
+Purpose:
+- Phase-1 workspace: a fixed-boundary GS parameter sweep that writes a surrogate-training `dataset.h5`.
+
+Layout:
+- `L0/` — output of `python -m autotokamak.pipelines phase1` (in-process `run_sweep`; Phase-1 has no decision points, so it is always level L0).
+- Agent-*written* dataset generation is an L2/L3 benchmark condition, run via `python -m autotokamak.bench run` — see `benchmarks/README.md`.
+
+Quick run:
+
+```bash
+python -m autotokamak.pipelines phase1 --n-samples 500
+```
+
+## `examples/surrogate_automl`
+
+Purpose:
+- Standalone Phase-2 workspace (created on first `pipelines phase2` run; not
+  committed). Distinct from `surrogate_meta` below: this is one AutoML search
+  over an existing dataset, not the self-improving loop.
+
+Quick run:
+
+```bash
+python -m autotokamak.pipelines phase2 --level L0 --time-budget 600
+```
+
+## `examples/surrogate_meta`
+
+Purpose:
+- Meta-loop workspace: the self-improving Phase-1 → Phase-2 outer loop.
+
+Layout:
+- `L0/` and `L1/`, each with a `manifest.json` (run_id, key paths, score, and the run's `condition`: `L0-none` or `L1-dspy`).
+
+Quick run:
+
+```bash
+python -m autotokamak.pipelines meta --level L0 --target-accuracy-pct 90 --max-iterations 5
+```
+
 ## Outputs
 
-Both examples write timestamped or hashed run artifacts under each example's local `outputs/` directory.
+- The two hand-authored examples (`fixed_boundary`, `config_driven_equilibrium`) write
+  timestamped or hashed run artifacts under each example's local `outputs/` directory.
+- Pipeline runs (`phase1`/`phase2`/`meta`) write under `examples/<workspace>/<level>/` and
+  emit a `manifest.json` plus a self-contained HTML report for the run.
+- Benchmark runs (agent-written code, L2/L3) write under
+  `experiments/<tag>/<condition>/<run_id>/` instead — see `benchmarks/README.md`.

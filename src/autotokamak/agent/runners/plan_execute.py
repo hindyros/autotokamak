@@ -1,10 +1,11 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Plan -> execute runner (single pass, no replan loop).
 
 For the version with re-planning after execution, see
 ``agent.runners.plan_execute_feedback``.
 
 Each invocation writes ``experiments/<run_id>/trace.json`` (unless
-``--no-trace``); shape defined in ``agent.runners.trace``.
+``--no-trace``); shape defined in ``bench.trace``.
 """
 import argparse
 import sys
@@ -12,14 +13,14 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from agent.runners.config import (
+from autotokamak.agent.runners.config import (
     REPO_ROOT,
     load_config,
     materialize_symlinks,
     resolve_workspace,
 )
-from agent.runners.scoring import try_score
-from agent.runners.trace import RunTrace
+from autotokamak.bench.scoring import try_score
+from autotokamak.bench.trace import RunTrace
 
 load_dotenv(REPO_ROOT / ".env")
 

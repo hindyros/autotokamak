@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Library-level Phase-1 dataset sweep.
 
 Extracts the deterministic loop from the agent-authored runner at
@@ -29,12 +30,36 @@ import numpy as np
 from autotokamak.data.schema import PARAM_ORDER, SweepConfig, SweepResult
 
 
+def sobol_sample(lows: np.ndarray, highs: np.ndarray, n: int, *, seed: int) -> np.ndarray:
+    """Seeded scrambled-Sobol draw of ``n`` points in the box [lows, highs].
+
+    Low-discrepancy: covers the box more evenly than i.i.d. random points.
+    Shared by the ``sobol`` sweep method and the acquisition candidate pool
+    (``data.acquire``) so the two never drift apart.
+    """
+    import warnings
+
+    from scipy.stats import qmc
+
+    engine = qmc.Sobol(d=lows.size, scramble=True, seed=seed)
+    with warnings.catch_warnings():
+        # scipy warns when n is not a power of two; exact balance is not
+        # required for a training draw or a scoring pool.
+        warnings.simplefilter("ignore", category=UserWarning)
+        u = np.asarray(engine.random(n), dtype=np.float64)
+    return lows + u * (highs - lows)
+
+
 def _sample_inputs(cfg: SweepConfig) -> np.ndarray:
     """Return (N, 5) sample matrix in ``PARAM_ORDER``.
 
-    Uses ``scipy.stats.qmc.LatinHypercube`` for ``method=lhs`` and
-    ``numpy.random.default_rng`` for ``method=uniform``. Both are seeded so
-    two calls with the same ``SweepConfig`` produce the same matrix.
+    Three seeded methods (two calls with the same ``SweepConfig`` produce the
+    same matrix):
+      - ``lhs``     : ``scipy.stats.qmc.LatinHypercube`` — stratified, good
+                      1-D projections, the default.
+      - ``sobol``   : ``scipy.stats.qmc.Sobol`` — low-discrepancy, best
+                      uniformity of coverage in higher dimensions.
+      - ``uniform`` : ``numpy.random.default_rng`` — plain i.i.d. random.
     """
     from scipy.stats import qmc
 
@@ -44,6 +69,8 @@ def _sample_inputs(cfg: SweepConfig) -> np.ndarray:
     lows = np.array([cfg.parameters[p].low for p in PARAM_ORDER], dtype=np.float64)
     highs = np.array([cfg.parameters[p].high for p in PARAM_ORDER], dtype=np.float64)
 
+    if cfg.sampling.method == "sobol":
+        return sobol_sample(lows, highs, n, seed=seed)
     if cfg.sampling.method == "lhs":
         engine = qmc.LatinHypercube(d=d, seed=seed)
         u = np.asarray(engine.random(n=n), dtype=np.float64)
@@ -88,7 +115,11 @@ def _config_hash(cfg: SweepConfig) -> str:
     return hashlib.sha256(payload).hexdigest()[:16]
 
 
-def run_sweep(cfg: SweepConfig, output_dir: Path | str) -> SweepResult:
+def run_sweep(
+    cfg: SweepConfig,
+    output_dir: Path | str,
+    X: "np.ndarray | None" = None,
+) -> SweepResult:
     """Run the GS sweep described by ``cfg``; write HDF5 to ``output_dir``.
 
     Parameters
@@ -98,6 +129,12 @@ def run_sweep(cfg: SweepConfig, output_dir: Path | str) -> SweepResult:
         relative to ``output_dir``.
     output_dir : Path
         Directory the HDF5 lands in. Created if it does not exist.
+    X : (N, 5) array, optional
+        Explicit sample matrix (columns in ``PARAM_ORDER``). When given,
+        ``cfg.sampling`` is ignored and exactly these points are solved —
+        the entry point for acquisition-selected batches
+        (``data.acquire``). When None (default), samples are drawn from
+        ``cfg.sampling`` as before.
 
     Returns
     -------
@@ -112,7 +149,14 @@ def run_sweep(cfg: SweepConfig, output_dir: Path | str) -> SweepResult:
     output_dir.mkdir(parents=True, exist_ok=True)
     out_path = output_dir / cfg.output_path
 
-    X = _sample_inputs(cfg)
+    if X is None:
+        X = _sample_inputs(cfg)
+    else:
+        X = np.asarray(X, dtype=np.float64)
+        if X.ndim != 2 or X.shape[1] != len(PARAM_ORDER):
+            raise ValueError(
+                f"Explicit X must be (N, {len(PARAM_ORDER)}) in PARAM_ORDER; got {X.shape}"
+            )
     N = X.shape[0]
 
     R = np.linspace(cfg.output_grid.R.min, cfg.output_grid.R.max, cfg.output_grid.R.n)
@@ -201,4 +245,4 @@ def run_sweep(cfg: SweepConfig, output_dir: Path | str) -> SweepResult:
     )
 
 
-__all__ = ["run_sweep"]
+__all__ = ["run_sweep", "sobol_sample"]

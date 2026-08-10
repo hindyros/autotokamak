@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 from pathlib import Path
 from types import SimpleNamespace as NS
 

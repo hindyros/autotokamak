@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# provenance: URSA-generated (URSA plan->execute agent)
 """Run multiple OFT TokaMaker equilibria from a sweep YAML.
 
 This is a thin wrapper around `run_equilibrium_from_config.py` that:

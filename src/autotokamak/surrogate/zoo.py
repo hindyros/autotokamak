@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Classical surrogate model factories — the Phase-2 PoC zoo.
 
 Per advisor scope (``docs/project_agenda.md`` §3): four sklearn-only models.

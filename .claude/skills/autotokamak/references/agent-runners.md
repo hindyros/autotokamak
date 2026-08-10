@@ -6,10 +6,10 @@ All three write a structured trace to `experiments/<utc_run_id>/trace.json` unle
 
 ## `plan_execute_feedback` (primary)
 
-One or more plan → execute → re-plan cycles. After each round the planner sees the execution history and can propose follow-up steps to fix failures or terminate.
+One or more plan → execute → re-plan cycles. After each round the planner sees the execution history and can propose follow-up steps to fix failures or terminate. The engine is exposed as `run_feedback_loop(...)` (importable, used by `meta_loop` sub-runs and the `ursa` bench harness); `main()` is the YAML CLI over it.
 
 ```
-python -m agent.runners.plan_execute_feedback \
+python -m autotokamak.agent.runners.plan_execute_feedback \
     --config src/autotokamak/agent/prompts/dataset_generation.yaml \
     [--model openai:gpt-5-mini] \
     [--workspace examples/dataset_generation] \
@@ -26,7 +26,7 @@ python -m agent.runners.plan_execute_feedback \
 ## `plan_execute` (legacy, single-pass)
 
 ```
-python -m agent.runners.plan_execute --config PATH [--model M] [--workspace W] [--no-trace]
+python -m autotokamak.agent.runners.plan_execute --config PATH [--model M] [--workspace W] [--no-trace]
 ```
 
 No re-plan, no hygiene enforcement. Prefer `plan_execute_feedback` unless the prompt is intentionally single-shot.
@@ -36,7 +36,7 @@ No re-plan, no hygiene enforcement. Prefer `plan_execute_feedback` unless the pr
 Consumes the `surrogate_meta.yaml` prompt shape (no `problem:` field; structured `ActionDecision` output each iteration).
 
 ```
-python -m agent.runners.meta_loop \
+python -m autotokamak.agent.runners.meta_loop \
     --config src/autotokamak/agent/prompts/surrogate_meta.yaml \
     [--model openai:gpt-5.2] \
     [--max-iterations 3] \
@@ -58,13 +58,16 @@ model: openai:gpt-5.2
 
 **Per-iteration flow:**
 
-1. Compute deterministic diagnostics on the current dataset (via `autotokamak.eval.diagnostics.run_all`).
-2. Call `pick_action_via_llm` → returns a Pydantic `ActionDecision` with `action ∈ {regen_dataset, extend_search, terminate}` and a one-sentence `diagnosis`.
+1. Compute deterministic diagnostics on the current dataset (via `autotokamak.surrogate.diagnostics.run_all`).
+2. Call `pick_action_via_llm` → returns a Pydantic `ActionDecision` with `action ∈ {regen_dataset, extend_search, enrich_active, terminate}` and a one-sentence `diagnosis`.
 3. Dispatch via `autotokamak.agent.orchestrator.actions.dispatch`:
    - `regen_dataset(overrides)` → apply overrides to `base_sweep_config`, re-run Phase-1, update `state.current_dataset_h5`.
-   - `extend_search(focus)` → invoke `plan_execute_feedback` as a sub-run on `phase2_prompt`, load the winner, update `best_rmse` if improved.
+   - `extend_search(focus)` → run a fresh Phase-2 search, load the winner, update `best_rmse` if improved. Phase-2 mode is `structured` (library AutoML) by default and always when driven by `pipelines meta`; the `codegen` hybrid (URSA writes the Phase-2 code) is reachable only via the meta YAML config.
+   - `enrich_active(n_new)` → residual-driven active-learning acquisition of new samples.
    - `terminate(reason, confidence)` → stop.
 4. Measure test RMSE with the current best winner on the current dataset.
+
+`meta_loop.run()` also accepts a `phase2_decision_fn=` parameter (structured mode only) that replaces the DSPy search-round picker with a caller-supplied decision function — this is how the L0 scripted policy (`autotokamak.policies.scripted`) drives it without any LLM.
 
 **Outputs:**
 - `workspace/iterations/<NNN>/{diagnostics,action,result}.json` — per-iteration audit trail.
@@ -99,7 +102,7 @@ The `meta_loop` runner uses the DSPy module by default; `--use-baseline` forces 
 
 ## Trace format
 
-Every runner writes an `experiments/<utc_run_id>/trace.json` shaped like:
+The trace writer is `autotokamak.bench.trace.RunTrace` and the run scorer is `autotokamak.bench.scoring` (both moved from `agent/runners/` into the `bench` package; the same trace shape is emitted by benchmark harness runs under `experiments/<tag>/<condition>/<run_id>/`). Every runner writes an `experiments/<utc_run_id>/trace.json` shaped like:
 
 ```json
 {

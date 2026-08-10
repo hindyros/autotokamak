@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Unit tests for the corrected ``metric_meta`` quality terms."""
 
 from __future__ import annotations

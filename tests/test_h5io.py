@@ -1,3 +1,4 @@
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Tests for ``autotokamak.data.h5io`` — read/write/merge/split helpers."""
 
 from __future__ import annotations
@@ -8,7 +9,7 @@ import numpy as np
 import pytest
 
 from autotokamak.data.h5io import merge_h5, read_h5_arrays, split_h5, write_h5_arrays
-from autotokamak.eval.data import load_dataset
+from autotokamak.surrogate.dataset import load_dataset
 
 from tests.conftest import make_synthetic_h5
 
@@ -108,7 +109,7 @@ def test_merge_h5_counts_and_grid_mismatch(tmp_path: Path):
 
 
 def test_kfold_zero_test_frac():
-    from autotokamak.eval.data import kfold
+    from autotokamak.surrogate.dataset import kfold
 
     bundle = load_dataset_from_synth()
     splits = kfold(bundle, k=4, test_frac=0.0, seed=0)

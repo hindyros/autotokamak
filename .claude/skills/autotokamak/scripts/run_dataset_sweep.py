@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# provenance: Human/Claude-authored platform code (engineered, not agent-generated)
 """Run a Phase-1 dataset generation sweep via the platform library.
 
 Calls ``autotokamak.data.sweep.run_sweep`` directly — NOT the agent-generated
