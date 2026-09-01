@@ -81,9 +81,10 @@ class ClaudeSdkHarness(Harness):
 
         events_path = run_dir / "claude_events.jsonl"
         status, error, cost_usd, num_turns = "completed", None, None, None
+        usage: Optional[dict] = None
 
         async def _session() -> None:
-            nonlocal cost_usd, num_turns, error, status
+            nonlocal cost_usd, num_turns, error, status, usage
             from claude_agent_sdk import ClaudeAgentOptions, query
 
             options = ClaudeAgentOptions(
@@ -98,13 +99,7 @@ class ClaudeSdkHarness(Harness):
             # Runtime note, not task info: the Bash tool's cwd persists across
             # calls, so an agent that cd's away (e.g. through the OFT symlink)
             # silently litters the enclosing repo. Pin it to absolute paths.
-            prompt = (
-                task.render_prompt(self.name)
-                + f"\n\nRUNTIME NOTE: your workspace directory is\n{workspace.resolve()}\n"
-                  "Create ALL files under this directory (absolute paths are "
-                  "safest). Never write outside it, and if you change "
-                  "directory for exploration, change back before writing."
-            )
+            prompt = task.render_prompt(self.name) + self.workspace_note(workspace)
             step_no = 0
             with events_path.open("w", encoding="utf-8") as events:
                 async for message in query(prompt=prompt, options=options):
@@ -121,6 +116,8 @@ class ClaudeSdkHarness(Harness):
                     elif kind == "ResultMessage":
                         cost_usd = payload.get("total_cost_usd")
                         num_turns = payload.get("num_turns")
+                        if isinstance(payload.get("usage"), dict):
+                            usage = payload["usage"]
                         subtype = payload.get("subtype")
                         if subtype and subtype != "success":
                             status = "errored"
@@ -163,14 +160,18 @@ class ClaudeSdkHarness(Harness):
             wall_seconds=time.time() - started,
             cost_usd=cost_usd,
             error=error,
-            extra={"num_turns": num_turns} if num_turns is not None else {},
+            extra={
+                **({"num_turns": num_turns} if num_turns is not None else {}),
+                **({"usage": usage} if usage else {}),
+            },
         )
 
 
 def _message_payload(message: Any) -> dict[str, Any]:
     """Best-effort flatten of SDK message objects (robust across SDK versions)."""
     out: dict[str, Any] = {}
-    for attr in ("subtype", "total_cost_usd", "num_turns", "duration_ms", "is_error"):
+    for attr in ("subtype", "total_cost_usd", "num_turns", "duration_ms", "is_error",
+                 "usage"):
         val = getattr(message, attr, None)
         if val is not None:
             out[attr] = val

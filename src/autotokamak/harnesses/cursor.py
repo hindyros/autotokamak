@@ -80,9 +80,10 @@ class CursorHarness(Harness):
 
         events_path = run_dir / "cursor_events.jsonl"
         status, error, tail = "completed", None, ""
+        usage, result_evt = None, None
         try:
             proc = subprocess.run(
-                _argv(task.render_prompt(self.name),
+                _argv(task.render_prompt(self.name) + self.workspace_note(workspace),
                       self.resolve_model(task, model)),
                 cwd=workspace,
                 capture_output=True,
@@ -93,11 +94,28 @@ class CursorHarness(Harness):
             if proc.stderr:
                 (run_dir / "cursor_stderr.log").write_text(proc.stderr, encoding="utf-8")
             tail = _events_tail(proc.stdout)
+            usage, result_evt = _final_result(proc.stdout)
             if proc.returncode != 0:
+                # Prefer the stream's own verdict (parity with claude_sdk,
+                # which keys off ResultMessage.subtype): a non-zero exit
+                # after a successful final result event is a shutdown
+                # artifact, not an agent failure.
+                if result_evt and not result_evt.get("is_error") \
+                        and result_evt.get("subtype") == "success":
+                    error = None
+                else:
+                    status = "errored"
+                    error = f"cursor-agent exit {proc.returncode}: {proc.stderr[-500:]}"
+            elif result_evt and result_evt.get("is_error"):
                 status = "errored"
-                error = f"cursor-agent exit {proc.returncode}: {proc.stderr[-500:]}"
-        except subprocess.TimeoutExpired:
+                error = f"cursor result is_error (subtype={result_evt.get('subtype')})"
+        except subprocess.TimeoutExpired as exc:
             status, error = "timeout", f"exceeded {timeout}s (known -p hang mode — killed)"
+            # keep the partial stream — diagnostics + token usage up to the kill
+            partial = exc.stdout.decode() if isinstance(exc.stdout, bytes) else (exc.stdout or "")
+            if partial:
+                events_path.write_text(partial, encoding="utf-8")
+                usage, _ = _final_result(partial)
         except FileNotFoundError:
             status, error = "errored", f"'{CURSOR_BIN}' not found on PATH"
         except KeyboardInterrupt:
@@ -123,7 +141,25 @@ class CursorHarness(Harness):
             trace_path=trace._path,
             wall_seconds=time.time() - started,
             error=error,
+            # cursor reports token usage but no dollar figure; cost is derived
+            # downstream (tools/cost_report.py) from a model price table.
+            extra={"usage": usage} if usage else {},
         )
+
+
+def _final_result(stdout: str) -> tuple[Optional[dict], Optional[dict]]:
+    """Token usage + the final ``type=="result"`` event from the stream."""
+    usage, result_evt = None, None
+    for ln in stdout.splitlines():
+        try:
+            evt = json.loads(ln)
+        except json.JSONDecodeError:
+            continue
+        if evt.get("type") == "result":
+            result_evt = evt
+            if isinstance(evt.get("usage"), dict):
+                usage = evt["usage"]
+    return usage, result_evt
 
 
 def _events_tail(stdout: str, n: int = 5) -> str:

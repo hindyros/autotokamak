@@ -20,5 +20,8 @@ see `benchmarks/README.md`.)
 | `probe_feasible_box.py` | LHS-samples candidate shaping-parameter boxes and reports the clean-isoflux success rate per box. |
 | `collect_traces.sh` | Runs the meta-loop N times to collect traces for offline GEPA prompt optimization (`agent/dspy/optimize_meta.py`). |
 | `matrix_report.py` | Cross-condition matrix report: scores every cell (bench `predict.py` or pipeline `winner.pkl`) on the frozen benchmark test set; renders `experiments/<tag>/index.html`. |
+| `eval_code_metrics.py` | Static (zero-LLM) metrics over every agent workspace in a tag: SLOC, structure, imports (library leverage / L3-violation cross-check / LLM-in-loop detection), seeds, ruff counts → `<run_dir>/eval/code_metrics.json` + `experiments/<tag>/code_metrics.csv`. |
+| `judge_code.py` | Blind, outcome-blind LLM-as-judge over agent workspaces: 7-dimension rubric (1–5, evidence-required) per run (`score`), plus a cross-cell synthesis (`compare` → `judge_report.md`). Anonymized bundles, brand tokens redacted; `--samples N` for median-of-N. |
+| `cost_report.py` | Per-run cost/efficiency table for a tag: measured $ (claude_sdk/pi/dspy/ursa), token-derived $ (cursor + price table), wall-clock/turn proxies, solver-call counts. Harvests old runs' raw event streams retroactively. |
 
 Each script's module docstring documents its exact CLI; run with `--help` for flags.

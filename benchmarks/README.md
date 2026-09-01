@@ -75,7 +75,11 @@ the experiment.
 
 Current versions: v1 = original capability-test text; v2 (2026-08-10) adds
 the STORAGE VALIDATION GATE and DELIVERABLE SELF-TEST after the URSA agent
-stored all-NaN datasets as successes and shipped an untested predict.py.
+stored all-NaN datasets as successes and shipped an untested predict.py;
+v3 (2026-08-18, mini tasks only) fixes budget numbers left over from the
+full-size tasks — v2 mini stated "3 rounds of 100" and "500 per round /
+10-round cap" simultaneously, a ~17x solver-budget ambiguity. Use
+`L2_mini_v3.yaml` / `L3_mini_v3.yaml` for any new mini campaign.
 
 ## Adding a harness
 

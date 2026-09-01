@@ -80,6 +80,17 @@ class Harness(ABC):
         workspace.mkdir(parents=True, exist_ok=True)
         materialize_symlinks(workspace, task.symlinks)
 
+    def workspace_note(self, workspace: Path) -> str:
+        """Cwd-jail warning appended to the prompt by every subprocess-jailed
+        adapter (claude_sdk/pi/cursor) — identical wording across harnesses so
+        no cell gets private help against the shared cwd-escape failure mode."""
+        return (
+            f"\n\nRUNTIME NOTE: your workspace directory is\n{Path(workspace).resolve()}\n"
+            "Create ALL files under this directory (absolute paths are "
+            "safest). Never write outside it, and if you change "
+            "directory for exploration, change back before writing."
+        )
+
     def dry_run_info(self, task: TaskSpec, workspace: Path,
                      model: Optional[str] = None) -> dict[str, Any]:
         """What would run — subclasses override to expose exact argv/env keys."""
