@@ -46,22 +46,42 @@ class UrsaHarness(Harness):
             feedback_rounds=task.feedback_rounds,
         )
 
-        # Import inside run(): pulls in langchain + ursa, which are optional
-        # for every other harness.
-        from autotokamak.agent.runners.plan_execute_feedback import run_feedback_loop
-
         status, error = "completed", None
+        cost_usd, usage = None, None
         try:
-            run_feedback_loop(
-                problem=task.render_prompt(self.name),
-                workspace_path=workspace,
-                model_name=model_name,
-                feedback_rounds=task.feedback_rounds,
-                trace=trace,
-                expected_artifacts=task.expected_artifacts,
-                scorer_dotted=task.scorer,
-                scorer_kwargs=task.scorer_kwargs,
-            )
+            # Import inside the guard: pulls in langchain + ursa, which are
+            # optional for every other harness — a missing dep must still
+            # produce a result.json, like the CLI-substrate adapters.
+            from autotokamak.agent.runners.plan_execute_feedback import run_feedback_loop
+
+            # OpenAI-model token/cost accounting; harmless no-op otherwise.
+            try:
+                from langchain_community.callbacks import get_openai_callback
+            except ImportError:
+                get_openai_callback = None
+
+            def _invoke() -> None:
+                run_feedback_loop(
+                    problem=task.render_prompt(self.name),
+                    workspace_path=workspace,
+                    model_name=model_name,
+                    feedback_rounds=task.feedback_rounds,
+                    trace=trace,
+                    expected_artifacts=task.expected_artifacts,
+                    scorer_dotted=task.scorer,
+                    scorer_kwargs=task.scorer_kwargs,
+                )
+
+            if get_openai_callback is not None:
+                with get_openai_callback() as cb:
+                    _invoke()
+                if cb.total_tokens:
+                    cost_usd = round(cb.total_cost, 6) if cb.total_cost else None
+                    usage = {"prompt_tokens": cb.prompt_tokens,
+                             "completion_tokens": cb.completion_tokens,
+                             "n_lm_calls": cb.successful_requests}
+            else:
+                _invoke()
         except KeyboardInterrupt:
             status, error = "interrupted", "KeyboardInterrupt"
         except Exception as exc:  # noqa: BLE001 — trace already marked errored
@@ -76,5 +96,7 @@ class UrsaHarness(Harness):
             workspace=workspace,
             trace_path=trace._path,
             wall_seconds=time.time() - started,
+            cost_usd=cost_usd,
             error=error,
+            extra={"usage": usage} if usage else {},
         )

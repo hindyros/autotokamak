@@ -1,0 +1,14 @@
+{
+  "action": "enrich_active",
+  "regen": null,
+  "enrich": {
+    "n_new": 200,
+    "strategy": "residual_ucb",
+    "beta": 0.6,
+    "feasibility_weighting": true,
+    "rationale": "Residual-driven active learning will concentrate new solves in the specific input regions driving the errors, giving higher RMSE reduction per added sample than blind regeneration or additional hyperparameter search."
+  },
+  "extend": null,
+  "terminate": null,
+  "diagnosis": "The surrogate is still sample-bottlenecked with strongly structured residuals along (r0, a, kappa, delta, Ip), not tuning-limited or split-noise-limited."
+}

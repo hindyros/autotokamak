@@ -1,0 +1,40 @@
+{
+  "kind": "enrich_active",
+  "refit_shard_rmse": 0.0007465701460549403,
+  "refit_became_best": true,
+  "refit_path": "/Users/hindy/Desktop/Deep Deka/autokamak/examples/surrogate_meta/fast/refits/iter1.pkl",
+  "refit_n_samples": 624,
+  "acquisition": {
+    "method": "residual_ucb",
+    "n_selected": 200,
+    "n_candidates": 4096,
+    "n_pca_components": 0,
+    "pca_explained_variance": 0.0,
+    "score_first": -6.595214775024589,
+    "score_last": -7.0854159147727644,
+    "mean_feasibility": 0.853158100077454,
+    "kernel_summaries": [
+      "3.63**2 * RBF(length_scale=[2.4, 0.647, 49.6, 3.3, 3.42]) + WhiteKernel(noise_level=0.0363)"
+    ],
+    "seed": 2,
+    "notes": "Residual-UCB acquisition: 200 points from a 4096-point Sobol pool; error model = ARD-RBF GP on log OOF residuals of winner 'kernel_ridge' (424 samples, 4-fold); beta=0.6; feasibility weighting ACTIVE (floor=0.02).",
+    "beta": 0.6,
+    "residual_summary": {
+      "n_oof": 424,
+      "k_folds": 4,
+      "resid_mean": 0.0005682562824474216,
+      "resid_max": 0.0016926186435686735,
+      "resid_p90": 0.0008256176183687061
+    }
+  },
+  "dataset_path": "/Users/hindy/Desktop/Deep Deka/autokamak/examples/surrogate_meta/fast/datasets/iter1_dataset.h5",
+  "prior_dataset_path": "/Users/hindy/Desktop/Deep Deka/autokamak/examples/surrogate_meta/fast/datasets/train_pool.h5",
+  "new_shard_path": "/Users/hindy/Desktop/Deep Deka/autokamak/examples/surrogate_meta/fast/datasets/iter1_active.h5",
+  "n_new_requested": 200,
+  "n_new_succeeded": 200,
+  "n_new_isoflux_used": 0,
+  "n_total": 625,
+  "n_total_succeeded": 624,
+  "n_total_isoflux_used": 0,
+  "rationale": "Residual-UCB active enrichment will add solves where the current winner is predictably wrong along those correlated inputs, yielding better RMSE reduction per new sample than blind regeneration."
+}

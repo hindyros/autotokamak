@@ -108,7 +108,13 @@ def make_tools(workspace: Path, tool_log: list[dict]):
     def _resolve(path: str) -> Path:
         p = (workspace / path).resolve()
         if not p.is_relative_to(workspace):
-            raise ValueError(f"path escapes the workspace: {path}")
+            # Task-provided symlinks (e.g. the OpenFUSIONToolkit reference
+            # clone) resolve outside the workspace by construction; paths
+            # whose UNRESOLVED form stays inside the jail are legitimate —
+            # other substrates can read this material, so must dspy.
+            unresolved = Path(os.path.normpath(workspace / path))
+            if not unresolved.is_relative_to(workspace):
+                raise ValueError(f"path escapes the workspace: {path}")
         return p
 
     def _clip(text: str, limit: int = MAX_TOOL_OUTPUT_CHARS) -> str:
@@ -302,9 +308,23 @@ class DspyHarness(Harness):
             feedback_rounds=task.feedback_rounds,
         )
 
-        import dspy
+        status, error = "completed", None
+        lm = None
+        try:
+            import dspy
 
-        dspy.configure(lm=dspy.LM(model_name, temperature=1.0, max_tokens=32_000))
+            lm = dspy.LM(model_name, temperature=1.0, max_tokens=32_000)
+            dspy.configure(lm=lm)
+        except Exception as exc:  # noqa: BLE001 — missing dep/bad model must
+            # still yield a result.json, like every other adapter
+            trace.mark_errored(exc)
+            return RunResult(
+                status="errored", run_id=run_id,
+                condition=self.condition_for(task), harness=self.name,
+                model=model_name, workspace=workspace, trace_path=trace._path,
+                wall_seconds=time.time() - started,
+                error=f"{type(exc).__name__}: {exc}",
+            )
 
         tool_log: list[dict] = []
         campaign = _build_campaign(
@@ -314,7 +334,6 @@ class DspyHarness(Harness):
             fix_rounds=max(0, task.feedback_rounds - 1),
         )
 
-        status, error = "completed", None
         try:
             final = campaign(task=task.render_prompt(self.name), trace=trace)
             trace.record_artifacts(workspace, expected_artifacts=task.expected_artifacts)
@@ -336,6 +355,25 @@ class DspyHarness(Harness):
                 for rec in tool_log:
                     f.write(json.dumps(rec) + "\n")
 
+        # litellm computes per-call cost + usage; harvest from the LM history.
+        cost_usd, usage = None, None
+        try:
+            history = getattr(lm, "history", None) or []
+            costs = [h.get("cost") for h in history if h.get("cost") is not None]
+            if costs:
+                cost_usd = round(float(sum(costs)), 6)
+            prompt_toks = completion_toks = 0
+            for h in history:
+                u = h.get("usage") or {}
+                prompt_toks += int(u.get("prompt_tokens") or 0)
+                completion_toks += int(u.get("completion_tokens") or 0)
+            if prompt_toks or completion_toks:
+                usage = {"prompt_tokens": prompt_toks,
+                         "completion_tokens": completion_toks,
+                         "n_lm_calls": len(history)}
+        except Exception:  # noqa: BLE001 — usage capture must never fail a run
+            pass
+
         return RunResult(
             status=status,
             run_id=run_id,
@@ -345,6 +383,8 @@ class DspyHarness(Harness):
             workspace=workspace,
             trace_path=trace._path,
             wall_seconds=time.time() - started,
+            cost_usd=cost_usd,
             error=error,
-            extra={"n_tool_calls": len(tool_log)},
+            extra={"n_tool_calls": len(tool_log),
+                   **({"usage": usage} if usage else {})},
         )

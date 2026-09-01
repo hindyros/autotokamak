@@ -23,6 +23,7 @@ Each invocation also writes a structured trace to ``experiments/<run_id>/trace.j
 
 import argparse
 import sys
+import time
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -190,13 +191,31 @@ def run_feedback_loop(
                 )
                 step_rec = trace.start_step(round_rec, i, step_name) if (trace and round_rec) else None
                 try:
-                    result = executor.invoke(
-                        {
-                            "messages": [HumanMessage(content=prompt)],
-                            "workspace": workspace,
-                            "symlinkdir": None,
-                        }
-                    )
+                    # Bounded retry on connection-class errors only: the CLI
+                    # substrates (claude/cursor/pi) retry transient provider
+                    # failures internally, so without this a single dropped
+                    # connection kills an URSA run that other harnesses would
+                    # survive — an adapter artifact, not a capability signal.
+                    result = None
+                    for attempt in range(3):
+                        try:
+                            result = executor.invoke(
+                                {
+                                    "messages": [HumanMessage(content=prompt)],
+                                    "workspace": workspace,
+                                    "symlinkdir": None,
+                                }
+                            )
+                            break
+                        except Exception as exc:  # noqa: BLE001
+                            transient = "connection" in type(exc).__name__.lower() \
+                                or "timeout" in type(exc).__name__.lower()
+                            if not transient or attempt == 2:
+                                raise
+                            wait = 20 * (attempt + 1)
+                            print(f"[retry] {type(exc).__name__} on step {i}; "
+                                  f"retrying in {wait}s", file=sys.stderr)
+                            time.sleep(wait)
                     last_summary = result["messages"][-1].text
                     if trace and step_rec is not None:
                         trace.finish_step(step_rec, ok=True, result_text=last_summary)

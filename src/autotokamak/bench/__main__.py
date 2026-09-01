@@ -5,6 +5,7 @@
                                          --harness claude_sdk [--model ...] [--tag aug09] [--dry-run]
     python -m autotokamak.bench validate --workspace experiments/<tag>/<cond>/<run_id>/workspace \\
                                          --task benchmarks/tasks/L3_from_scratch.yaml
+    python -m autotokamak.bench score    --run-dir experiments/<tag>/<cond>/<run_id>
     python -m autotokamak.bench compare  --tag aug09
     python -m autotokamak.bench freeze-testset [--n 60] [--seed 20260809]
 
@@ -52,7 +53,15 @@ def cmd_run(args) -> int:
         print(json.dumps(info, indent=2))
         return 0
 
-    run_dir.mkdir(parents=True, exist_ok=True)
+    # 1-second run_id resolution: parallel launches of the same condition
+    # must not silently share (and overwrite) one run dir.
+    for suffix in range(2, 100):
+        try:
+            run_dir.mkdir(parents=True, exist_ok=False)
+            break
+        except FileExistsError:
+            run_dir = EXPERIMENTS_DIR / tag / condition / f"{run_id}-{suffix}"
+            workspace = run_dir / "workspace"
     print(f"[bench] condition={condition} run_dir={run_dir}")
     result = harness.run(
         task,
@@ -63,6 +72,11 @@ def cmd_run(args) -> int:
     )
 
     payload = result.to_dict()
+    payload["task"] = {
+        "task_id": task.task_id,
+        "prompt_version": task.prompt_version,
+        "path": str(task.source_path),
+    }
 
     from autotokamak.bench.contract import score_against_frozen, validate_deliverables
 
@@ -73,7 +87,13 @@ def cmd_run(args) -> int:
     )
     payload["contract"] = contract.to_dict()
 
-    if contract.passed and FROZEN_TESTSET.is_file() and not args.skip_frozen_score:
+    # Score whenever the predictor itself works — a missing README must not
+    # cost a paid cell its head-to-head number. contract.passed still gates
+    # "did it meet the full deliverable contract" in the matrix.
+    predict_ok = all(
+        contract.gates.get(g) for g in ("predict_runs", "predict_shape", "predict_grid")
+    )
+    if predict_ok and FROZEN_TESTSET.is_file() and not args.skip_frozen_score:
         try:
             payload["frozen_score"] = score_against_frozen(workspace, FROZEN_TESTSET)
         except Exception as exc:  # noqa: BLE001
@@ -97,6 +117,29 @@ def cmd_validate(args) -> int:
     )
     print(json.dumps(report.to_dict(), indent=2))
     return 0 if report.passed else 1
+
+
+def cmd_score(args) -> int:
+    """Backfill head-to-head scoring for an existing run (no agent re-run)."""
+    from autotokamak.bench.contract import score_against_frozen
+
+    if not FROZEN_TESTSET.is_file():
+        print(f"No frozen test set: {FROZEN_TESTSET}", file=sys.stderr)
+        return 1
+    run_dir = Path(args.run_dir) if args.run_dir else None
+    workspace = Path(args.workspace) if args.workspace else run_dir / "workspace"
+    try:
+        score = score_against_frozen(workspace, FROZEN_TESTSET)
+    except Exception as exc:  # noqa: BLE001
+        score = {"error": f"{type(exc).__name__}: {exc}"}
+    print(json.dumps(score, indent=2))
+    if run_dir and (run_dir / "result.json").is_file():
+        payload = json.loads((run_dir / "result.json").read_text())
+        payload["frozen_score"] = score
+        (run_dir / "result.json").write_text(
+            json.dumps(payload, indent=2), encoding="utf-8")
+        print(f"[bench] updated {run_dir / 'result.json'}")
+    return 0 if "error" not in score else 1
 
 
 def cmd_compare(args) -> int:
@@ -175,6 +218,12 @@ def main() -> int:
     p.add_argument("--task", required=True)
     p.add_argument("--skip-predict-check", action="store_true")
     p.set_defaults(fn=cmd_validate)
+
+    p = sub.add_parser("score", help="(Re)score an existing workspace on the frozen test set")
+    g = p.add_mutually_exclusive_group(required=True)
+    g.add_argument("--run-dir", help="experiments/<tag>/<cond>/<run_id>; updates its result.json")
+    g.add_argument("--workspace", help="score a bare workspace; print only")
+    p.set_defaults(fn=cmd_score)
 
     p = sub.add_parser("compare", help="Comparison table across a tag's runs")
     p.add_argument("--tag", required=True)

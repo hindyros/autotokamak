@@ -85,9 +85,10 @@ class PiHarness(Harness):
 
         events_path = run_dir / "pi_events.jsonl"
         status, error, tail = "completed", None, ""
+        cost_usd, usage = None, None
         try:
             proc = subprocess.run(
-                _argv(task.render_prompt(self.name),
+                _argv(task.render_prompt(self.name) + self.workspace_note(workspace),
                       self.resolve_model(task, model)),
                 cwd=workspace,           # load-bearing: pi has no cwd flag
                 capture_output=True,
@@ -98,11 +99,18 @@ class PiHarness(Harness):
             if proc.stderr:
                 (run_dir / "pi_stderr.log").write_text(proc.stderr, encoding="utf-8")
             tail = _events_tail(proc.stdout)
+            cost_usd, usage = _usage_from_events(proc.stdout)
             if proc.returncode != 0:
                 status = "errored"
                 error = f"pi exit {proc.returncode}: {proc.stderr[-500:]}"
-        except subprocess.TimeoutExpired:
+        except subprocess.TimeoutExpired as exc:
             status, error = "timeout", f"exceeded {timeout}s"
+            # keep whatever the stream produced before the kill — a timed-out
+            # run must not lose its diagnostics and usage data
+            partial = exc.stdout.decode() if isinstance(exc.stdout, bytes) else (exc.stdout or "")
+            if partial:
+                events_path.write_text(partial, encoding="utf-8")
+                cost_usd, usage = _usage_from_events(partial)
         except FileNotFoundError:
             status, error = "errored", f"'{PI_BIN}' not found on PATH (npm i -g @mariozechner/pi-coding-agent)"
         except KeyboardInterrupt:
@@ -127,8 +135,35 @@ class PiHarness(Harness):
             workspace=workspace,
             trace_path=trace._path,
             wall_seconds=time.time() - started,
+            cost_usd=cost_usd,
             error=error,
+            extra={"usage": usage} if usage else {},
         )
+
+
+def _usage_from_events(stdout: str) -> tuple[Optional[float], Optional[dict]]:
+    """Sum pi's per-message usage/cost (``message_end`` events only —
+    ``turn_end`` repeats the same message and would double-count)."""
+    cost_total = 0.0
+    tokens = {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0}
+    seen = False
+    for ln in stdout.splitlines():
+        try:
+            evt = json.loads(ln)
+        except json.JSONDecodeError:
+            continue
+        if evt.get("type") != "message_end":
+            continue
+        u = (evt.get("message") or {}).get("usage") or {}
+        if not u:
+            continue
+        seen = True
+        cost_total += float((u.get("cost") or {}).get("total") or 0.0)
+        for k in tokens:
+            tokens[k] += int(u.get(k) or 0)
+    if not seen:
+        return None, None
+    return round(cost_total, 6), tokens
 
 
 def _events_tail(stdout: str, n: int = 5) -> str:

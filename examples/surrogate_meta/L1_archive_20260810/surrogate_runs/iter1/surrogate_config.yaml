@@ -1,0 +1,10 @@
+{
+  "dataset_h5": "/Users/hindy/Desktop/Deep Deka/autokamak/examples/surrogate_meta/fast/datasets/train_pool.h5",
+  "time_budget_seconds": 600,
+  "n_pca_components_default": 8,
+  "seed": 0,
+  "k_folds": 4,
+  "test_frac": 0.0,
+  "output_dir": "outputs",
+  "mode": "structured"
+}

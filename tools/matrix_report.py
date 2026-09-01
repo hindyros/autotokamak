@@ -308,7 +308,7 @@ def _campaign_given(trace_path: Path) -> dict:
             if m:
                 suffix = "% error reduction" if label == "early stop" else ""
                 out[label] = f"≤{m.group(1)}" if label == "initial design" else m.group(1) + suffix
-        out["task"] = spec.task_id
+        out["task"] = f"{spec.task_id} (prompt v{spec.prompt_version})"
         out["timeout"] = f"{spec.timeout_seconds}s"
         out["feedback rounds"] = spec.feedback_rounds
     except Exception:  # noqa: BLE001
@@ -620,7 +620,14 @@ def main() -> int:
         # Head-to-head on the frozen set.
         try:
             if c["_kind"] == "bench":
-                if c.get("status") == "completed" and c.get("contract", {}).get("passed"):
+                # Score whenever the predictor works — matching bench run/score.
+                # A cell that failed an unrelated gate (e.g. missing README)
+                # still gets its head-to-head number; the gate table shows why
+                # contract.passed is false.
+                gates = c.get("contract", {}).get("gates", {})
+                predict_ok = all(gates.get(g) for g in
+                                 ("predict_runs", "predict_shape", "predict_grid"))
+                if predict_ok:
                     pred = predict_bench_cell(c["_workspace"], frozen)
                 else:
                     pred = None
@@ -629,6 +636,7 @@ def main() -> int:
             if pred is not None:
                 errs = rel_l2(pred, frozen["psi"])
                 finite = errs[np.isfinite(errs)]
+                row["n_scored"] = int(finite.size)
                 row["rel_l2_mean"] = float(np.mean(finite))
                 row["accuracy_pct"] = 100.0 * (1.0 - row["rel_l2_mean"] / baseline_mean)
                 row["psi_b64"] = plot_psi_panels(
